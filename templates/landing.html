@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoGather - Landing Page</title>
+<style>
+
+
+  :root {
+    --primary:       #a9455c;  /* main rose color: buttons, links, prices   */
+    --primary-dark:  #8a3549;  /* darker rose: hover states                 */
+    --primary-light: #fbe4e6;  /* very light pink: soft backgrounds, tags   */
+    --charcoal:      #2c2420;  /* near-black: headings, dark footer banner  */
+    --text:          #4a3d38;  /* normal paragraph text                     */
+    --text-muted:    #8a7b73;  /* faded/secondary text (captions, meta)     */
+    --border:        #f0e3d5;  /* thin border lines                         */
+    --bg:            #fdf3ea;  /* page background (warm cream)              */
+    --cream-deep:    #fbe7e3;  /* slightly deeper cream: card backgrounds   */
+    --card-bg:       #fffbf5;  /* near-white: feature card backgrounds      */
+    --radius:        16px;     /* corner rounding used everywhere           */
+    --shadow:        0 4px 18px rgba(44,36,32,0.06);
+    --font-display:  Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  }
+
+  /* Reset box-sizing so padding never overflows an element's set width */
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  h1, h2, h3 { font-family: var(--font-display); color: var(--charcoal); margin: 0; }
+  a { color: var(--primary-dark); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* =====================================================================
+     2) TOP NAVIGATION BAR
+     ===================================================================== */
+  .navbar { background: var(--bg); border-bottom: 1px solid var(--border); }
+  .navbar-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 18px 28px;
+    display: flex;                 /* puts brand on the left, links on the right */
+    align-items: center;
+    justify-content: space-between;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.35rem;
+    color: var(--charcoal);
+  }
+  .nav-links { display: flex; align-items: center; gap: 8px; }
+  .nav-links a {
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.92rem;
+    padding: 8px 16px;
+    border-radius: 999px;          /* fully rounded "pill" shape */
+  }
+  .nav-links a:hover { background: var(--cream-deep); text-decoration: none; }
+  .nav-cta {
+    background: var(--primary);
+    color: #fff !important;
+    padding: 9px 22px;
+    border-radius: 999px;
+    font-weight: 700;
+  }
+  .nav-cta:hover { background: var(--primary-dark); }
+
+  /* =====================================================================
+     3) HERO SECTION - big intro banner with headline + illustration
+     ===================================================================== */
+  .hero {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 60px 28px 20px;
+    display: flex;                 /* text on the left, picture on the right */
+    align-items: center;
+    gap: 48px;
+    flex-wrap: wrap;               /* stacks on top of each other on small screens */
+  }
+  .hero-text { flex: 1 1 420px; }
+  .eyebrow {
+    display: inline-block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--primary-dark);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    padding: 5px 14px;
+    border-radius: 999px;
+    margin-bottom: 18px;
+  }
+  .hero-text h1 { font-size: 2.75rem; line-height: 1.15; margin-bottom: 18px; }
+  .hero-text h1 em { font-style: italic; color: var(--primary); font-weight: 400; }
+  .hero-text p { font-size: 1.08rem; color: var(--text-muted); max-width: 480px; margin-bottom: 28px; }
+
+  .cta-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .btn {
+    display: inline-block;
+    padding: 10px 22px;
+    border-radius: 999px;
+    border: none;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn:hover { background: var(--primary-dark); text-decoration: none; }
+  .btn-outline { background: #fff; color: var(--primary); border: 1px solid var(--primary); }
+  .btn-outline:hover { background: var(--primary-light); }
+
+  .hero-illustration { flex: 1 1 380px; }
+  .illustration-frame {
+    border-radius: 200px 200px 24px 24px;   /* rounds top corners hard = "arch" shape */
+    overflow: hidden;
+    background: var(--cream-deep);
+    box-shadow: var(--shadow);
+    max-width: 420px;
+    margin: 0 auto;
+  }
+  .illustration-frame img { display: block; width: 100%; height: auto; }
+
+  /* =====================================================================
+     4) STATS ROW - three small numbers under the hero
+     ===================================================================== */
+  .stats-row {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px 28px 10px;
+    display: grid;                                  /* grid = table-like layout in CSS */
+    grid-template-columns: repeat(3, 1fr);          /* 3 equal-width columns */
+    text-align: center;
+  }
+  .stats-row .num { font-family: var(--font-display); font-size: 1.9rem; color: var(--charcoal); }
+  .stats-row .label { color: var(--text-muted); }
+
+  /* =====================================================================
+     5) FEATURE CARDS - the 4-box grid explaining what the site does
+     ===================================================================== */
+  .section { max-width: 1200px; margin: 0 auto; padding: 40px 28px 70px; }
+  .section-head { text-align: center; max-width: 560px; margin: 0 auto 36px; }
+  .section-head p { color: var(--text-muted); margin-top: 10px; }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 22px;
+  }
+  .feature-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 26px 22px;
+    box-shadow: var(--shadow);
+  }
+  .feature-card h3 { font-size: 1.08rem; margin-bottom: 8px; }
+  .feature-card p { color: var(--text-muted); font-size: 0.9rem; margin: 0; }
+
+  /* =====================================================================
+     6) DARK FOOTER CALL-TO-ACTION BANNER
+     ===================================================================== */
+  .footer-cta {
+    background: var(--charcoal);
+    color: #f6e9dd;
+    border-radius: 28px;
+    max-width: 1140px;
+    margin: 0 auto 60px;
+    padding: 46px 40px;
+    text-align: center;
+  }
+  .footer-cta h2 { color: #fdf3e7; margin-bottom: 10px; }
+  .footer-cta p { color: #ddc9c3; margin-bottom: 22px; }
+  .footer-cta .btn { background: #fdf3e7; color: var(--charcoal); }
+  .footer-cta .btn:hover { background: #fff; }
+
+  footer.site-footer {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    padding: 20px;
+  }
+
+</style>
+</head>
+<body>
+
+  <!-- All hrefs below are real Flask routes (defined in app.py), not
+       other HTML files -- "/" is the landing route, "/login" the login
+       route, "/register" the register route. -->
+  <header class="navbar">
+    <div class="navbar-inner">
+      <a class="brand" href="/">GoGather</a>
+      <nav class="nav-links">
+        <a href="/">Welcome</a>
+        <a href="/login">Sign in</a>
+        <a class="nav-cta" href="/register">Plan a trip</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ============================= HERO SECTION ============================= -->
+  <section class="hero">
+    <div class="hero-text">
+      <span class="eyebrow">Nepal &middot; Travel Desk</span>
+      <h1>Nepal,<br><em>made easy to travel.</em></h1>
+      <p>GoGather is a travel desk for Nepal. Places, packages, and travel groups &mdash;
+         arranged in one calm dashboard, with a clear, fair cancellation policy on every booking.</p>
+      <div class="cta-row">
+        <a class="btn" href="/register">Start exploring</a>
+        <a class="btn btn-outline" href="/login">I have an account</a>
+      </div>
+    </div>
+    <div class="hero-illustration">
+      <div class="illustration-frame">
+        <!-- This image now lives in the static/ folder, so Flask serves
+             it at the URL /static/pict1.jpg -->
+        <img src="/static/pict1.jpg" alt="Illustration of the Himalayas with a pagoda and prayer flags">
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= STATS ROW ============================= -->
+  <section class="stats-row">
+    <div>
+      <div class="num">1,200+</div>
+      <div class="label">travellers guided</div>
+    </div>
+    <div>
+      <div class="num">5</div>
+      <div class="label">signature routes</div>
+    </div>
+    <div>
+      <div class="num">100%</div>
+      <div class="label">refunded when at fault</div>
+    </div>
+  </section>
+
+  <!-- ============================= FEATURES ============================= -->
+  <section class="section">
+    <div class="section-head">
+      <h2>One dashboard between you and your next journey.</h2>
+      <p>GoGather keeps exploring, booking, and travelling with others simple.</p>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3>Explore Places</h3>
+        <p>Browse hand-picked destinations across Nepal &mdash; mountains, heritage cities, lakes, and jungle.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Travel Packages</h3>
+        <p>Compare hotel type, transport, and duration side by side before you decide.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Travel Groups</h3>
+        <p>Start a group under any package, invite people, and chat together.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Fair &amp; Protected</h3>
+        <p>Every booking is covered by a clear agreement, with a full refund if we're at fault.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= FOOTER CTA ============================= -->
+  <div class="footer-cta">
+    <h2>Your Nepal itinerary starts here</h2>
+    <p>Register in a minute and start planning.</p>
+    <a class="btn" href="/register">Create your travel account</a>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-bottom">
+      <span>&copy; 2026 GoGather</span>
+      &middot;
+      <span lang="ne">शुभ यात्रा &mdash; safe travels.</span>
+    </div>
+  </footer>
+
+</body>
+</html>
