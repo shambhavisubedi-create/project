@@ -5,19 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GoGather - Login Page</title>
 <style>
-
-  /* Same color variables as landing.html - see that file for full comments */
   :root {
-    --primary:       #a9455c;
-    --primary-dark:  #8a3549;
+    --primary: #a9455c;
+    --primary-dark: #8a3549;
     --primary-light: #fbe4e6;
-    --charcoal:      #2c2420;
-    --text:          #4a3d38;
-    --text-muted:    #8a7b73;
-    --border:        #f0e3d5;
-    --bg:            #fdf3ea;
-    --cream-deep:    #fbe7e3;
-    --font-display:  Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    --charcoal: #2c2420;
+    --text: #4a3d38;
+    --text-muted: #8a7b73;
+    --border: #f0e3d5;
+    --bg: #fdf3ea;
+    --cream-deep: #fbe7e3;
+    --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
   }
 
   * { box-sizing: border-box; }
@@ -33,33 +31,20 @@
   a { color: var(--primary-dark); text-decoration: none; }
   a:hover { text-decoration: underline; }
 
-  /* ---------------- Simple top bar (same as landing page) ---------------- */
   .navbar { background: var(--bg); border-bottom: 1px solid var(--border); }
-  .navbar-inner {
-    max-width: 1200px; margin: 0 auto; padding: 18px 28px;
-    display: flex; align-items: center; justify-content: space-between;
-  }
+  .navbar-inner { max-width: 1200px; margin: 0 auto; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; }
   .brand { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; color: var(--charcoal); }
   .nav-links a { color: var(--text); font-weight: 600; font-size: 0.92rem; padding: 8px 16px; border-radius: 999px; margin-left: 4px; }
   .nav-cta { background: var(--primary); color: #fff !important; padding: 9px 22px; border-radius: 999px; font-weight: 700; }
 
-  /* =====================================================================
-     THE MAIN TRICK OF THIS PAGE: A SPLIT SCREEN
-     .auth-split is a flex container with TWO children:
-       1. .illustration-panel (left half -- picture + caption)
-       2. .form-panel         (right half -- the actual login form)
-     ===================================================================== */
-  .auth-split {
-    display: flex;
-    min-height: calc(100vh - 68px);   /* fill the screen below the navbar */
-    flex-wrap: wrap;                  /* stacks on top of each other on phones */
-  }
+  /* split screen: illustration left, form right */
+  .auth-split { display: flex; min-height: calc(100vh - 68px); flex-wrap: wrap; }
 
   .illustration-panel {
     flex: 1 1 45%;
     background: linear-gradient(160deg, var(--cream-deep) 0%, var(--primary-light) 100%);
     display: flex;
-    flex-direction: column;           /* stack image above caption */
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 40px;
@@ -68,17 +53,10 @@
   .illustration-caption { margin-top: 22px; text-align: center; color: var(--charcoal); font-family: var(--font-display); font-size: 1.15rem; max-width: 340px; }
   .illustration-caption span { display: block; font-family: -apple-system, sans-serif; font-size: 0.85rem; color: var(--text-muted); margin-top: 8px; font-weight: 400; }
 
-  .form-panel {
-    flex: 1 1 55%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 40px 24px;
-  }
+  .form-panel { flex: 1 1 55%; display: flex; align-items: center; justify-content: center; padding: 40px 24px; }
   .form-card { width: 100%; max-width: 400px; }
   .form-card p.subtitle { color: var(--text-muted); margin-bottom: 26px; }
 
-  /* ---------------- Form fields ---------------- */
   .form-group { margin-bottom: 16px; }
   label { display: block; font-weight: 600; font-size: 0.87rem; margin-bottom: 6px; }
   input[type=text], input[type=password] {
@@ -108,11 +86,8 @@
   .btn:hover { background: var(--primary-dark); }
 
   hr.sep { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
-
-  /* Error message box -- only appears when app.py's login() sent one */
   .error-box { background: #fbe7e3; border: 1px solid #e6b6ab; color: #8a3549; padding: 10px 14px; border-radius: 10px; font-size: 0.85rem; margin-bottom: 16px; }
 
-  /* On narrow screens, put the picture on top and the form below it */
   @media (max-width: 860px) {
     .illustration-panel { padding: 32px 24px 24px; }
     .illustration-panel img { max-width: 220px; }
@@ -121,7 +96,6 @@
 </head>
 <body>
 
-  <!-- ============================= NAVIGATION ============================= -->
   <header class="navbar">
     <div class="navbar-inner">
       <a class="brand" href="/">GoGather</a>
@@ -133,10 +107,7 @@
     </div>
   </header>
 
-  <!-- ============================= SPLIT SCREEN ============================= -->
   <div class="auth-split">
-
-    <!-- LEFT HALF: illustration + caption -->
     <div class="illustration-panel">
       <img src="/static/pict1.jpg" alt="Illustration of the Himalayas with a pagoda and prayer flags">
       <p class="illustration-caption">
@@ -145,36 +116,19 @@
       </p>
     </div>
 
-    <!-- RIGHT HALF: the login form itself -->
     <div class="form-panel">
       <div class="form-card">
         <h1>Sign in to GoGather</h1>
         <p class="subtitle">Enter your username and password to continue.</p>
 
-        <!-- if-block: this red box only shows up when app.py's login()
-             function passed a non-empty "error" value into the template -->
         {% if error %}
         <div class="error-box">{{ error }}</div>
         {% endif %}
 
-        <!--
-          method="POST" action="/login" means: when the user clicks
-          "Login", the browser sends the form data to the login()
-          function in app.py. On success that function redirects the
-          browser straight to /dashboard.
-        -->
         <form method="POST" action="/login">
           <div class="form-group">
             <label for="username">Username or Email</label>
-<input
-    type="text"
-    id="username"
-    name="username"
-    placeholder="Enter your username or email"
-    autocomplete="username"
-    required
-    autofocus
->
+            <input type="text" id="username" name="username" placeholder="Enter your username or email" autocomplete="username" required autofocus>
           </div>
           <div class="form-group">
             <label for="password">Password</label>
@@ -187,7 +141,6 @@
         <p class="subtitle">New traveller? <a href="/register">Register an account</a></p>
       </div>
     </div>
-
   </div>
 
 </body>

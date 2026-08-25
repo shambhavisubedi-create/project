@@ -1,2 +1,226 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ place.name }} | GoGather</title><style>:root{--wine:#a9455c;--ink:#2c2420;--text:#51433d;--muted:#82736b;--cream:#fdf3ea;--line:#eddfd4}*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--text);font-family:Segoe UI,Arial,sans-serif}.nav{height:72px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(24px,calc((100% - 1080px)/2))}.brand{font:700 23px Georgia,serif;color:var(--ink);text-decoration:none}.back{color:var(--wine);font-weight:700;text-decoration:none;font-size:14px}.wrap{max-width:1080px;margin:auto;padding:34px 24px 70px}.hero{height:360px;border-radius:22px;overflow:hidden;position:relative;background:#665045}.hero img{width:100%;height:100%;position:absolute;object-fit:cover}.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(32,22,17,.72),rgba(32,22,17,.15))}.hero-text{position:absolute;z-index:1;left:42px;bottom:40px;color:#fff;max-width:620px}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;color:#f8cfbf}.hero h1,h2,h3{font-family:Georgia,serif}.hero h1{font-size:clamp(36px,6vw,58px);margin:8px 0}.hero p{line-height:1.55;margin:0}.layout{display:grid;grid-template-columns:1.5fr .8fr;gap:28px;margin-top:28px}.panel{background:#fffdfa;border:1px solid var(--line);border-radius:16px;padding:26px;margin-bottom:20px}.panel h2{color:var(--ink);margin-top:0;font-size:26px}.panel p{line-height:1.7;color:var(--muted)}.list{display:flex;flex-wrap:wrap;gap:9px}.pill{padding:8px 11px;border-radius:8px;background:#f8ebe5;color:#74414b;font-size:13px;font-weight:600}.side h3{margin:0 0 7px;color:var(--ink)}.fact{padding:16px 0;border-bottom:1px solid var(--line)}.fact:last-child{border:0}.fact span{display:block;color:var(--muted);font-size:13px;margin-top:4px}.similar a{display:inline-block;margin:0 12px 10px 0;color:var(--wine);font-weight:700;text-decoration:none}@media(max-width:720px){.layout{grid-template-columns:1fr}.hero{height:310px}.hero-text{left:25px;bottom:26px}}</style></head><body><header class="nav"><a class="brand" href="{{ url_for('dashboard') }}">GoGather</a><a class="back" href="{{ url_for('explore_places') }}">← All destinations</a></header><main class="wrap"><section class="hero"><img src="{{ url_for('static',filename=place.image) }}" alt="{{ place.name }}"><div class="hero-text"><div class="eyebrow">{{ place.region }} · {{ place.category }}</div><h1>{{ place.name }}</h1><p>{{ place.description }}</p></div></section><div class="layout"><div><section class="panel"><h2>Why visit</h2><p>{{ place.description }} Plan around the season, choose a comfortable pace, and allow time to experience the local culture beyond the main sights.</p></section><section class="panel"><h2>Highlights</h2><div class="list">{% for item in place.highlights %}<span class="pill">{{ item }}</span>{% endfor %}</div><h2 style="margin-top:27px">Things to do</h2><div class="list">{% for item in place.activities %}<span class="pill">{{ item }}</span>{% endfor %}</div></section></div><aside class="panel side"><h2>Plan your visit</h2><div class="fact"><h3>Ideal stay</h3><span>{{ place.days }}</span></div><div class="fact"><h3>Best time to visit</h3><span>{{ place.best_time }}</span></div><div class="fact"><h3>Typical budget</h3><span>{{ place.budget }}</span></div><div class="fact"><h3>Expected weather</h3><span>{{ place.weather }}</span></div></aside></div>{% if similar_places %}<section class="panel similar"><h2>Similar places</h2>{% for item in similar_places %}<a href="{{ url_for('place_detail',slug=item.slug) }}">{{ item.name }} →</a>{% endfor %}</section>{% endif %}</main></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ place.name }} | GoGather</title>
+  <style>
+    :root {
+      --wine: #a9455c;
+      --ink: #2c2420;
+      --text: #51433d;
+      --muted: #82736b;
+      --cream: #fdf3ea;
+      --line: #eddfd4
+    }
+    * {
+      box-sizing: border-box
+    }
+    body {
+      margin: 0;
+      background: var(--cream);
+      color: var(--text);
+      font-family: Segoe UI,Arial,sans-serif
+    }
+    .nav {
+      height: 72px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 max(24px,calc((100% - 1080px)/2))
+    }
+    .brand {
+      font: 700 23px Georgia,serif;
+      color: var(--ink);
+      text-decoration: none
+    }
+    .back {
+      color: var(--wine);
+      font-weight: 700;
+      text-decoration: none;
+      font-size: 14px
+    }
+    .wrap {
+      max-width: 1080px;
+      margin: auto;
+      padding: 34px 24px 70px
+    }
+    .hero {
+      height: 360px;
+      border-radius: 22px;
+      overflow: hidden;
+      position: relative;
+      background: #665045
+    }
+    .hero img {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      object-fit: cover
+    }
+    .hero:after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg,rgba(32,22,17,.72),rgba(32,22,17,.15))
+    }
+    .hero-text {
+      position: absolute;
+      z-index: 1;
+      left: 42px;
+      bottom: 40px;
+      color: #fff;
+      max-width: 620px
+    }
+    .eyebrow {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-weight: 700;
+      color: #f8cfbf
+    }
+    .hero h1,h2,h3 {
+      font-family: Georgia,serif
+    }
+    .hero h1 {
+      font-size: clamp(36px,6vw,58px);
+      margin: 8px 0
+    }
+    .hero p {
+      line-height: 1.55;
+      margin: 0
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.5fr .8fr;
+      gap: 28px;
+      margin-top: 28px
+    }
+    .panel {
+      background: #fffdfa;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 26px;
+      margin-bottom: 20px
+    }
+    .panel h2 {
+      color: var(--ink);
+      margin-top: 0;
+      font-size: 26px
+    }
+    .panel p {
+      line-height: 1.7;
+      color: var(--muted)
+    }
+    .list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px
+    }
+    .pill {
+      padding: 8px 11px;
+      border-radius: 8px;
+      background: #f8ebe5;
+      color: #74414b;
+      font-size: 13px;
+      font-weight: 600
+    }
+    .side h3 {
+      margin: 0 0 7px;
+      color: var(--ink)
+    }
+    .fact {
+      padding: 16px 0;
+      border-bottom: 1px solid var(--line)
+    }
+    .fact:last-child {
+      border: 0
+    }
+    .fact span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px
+    }
+    .similar a {
+      display: inline-block;
+      margin: 0 12px 10px 0;
+      color: var(--wine);
+      font-weight: 700;
+      text-decoration: none
+    }
+    @media(max-width:720px) {
+      .layout {
+        grid-template-columns: 1fr
+      }
+      .hero {
+        height: 310px
+      }
+      .hero-text {
+        left: 25px;
+        bottom: 26px
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="{{ url_for('dashboard') }}">GoGather</a>
+    <a class="back" href="{{ url_for('explore_places') }}">← All destinations</a>
+  </header>
+  <main class="wrap">
+    <section class="hero">
+      <img src="{{ url_for('static',filename=place.image) }}" alt="{{ place.name }}">
+      <div class="hero-text">
+        <div class="eyebrow">{{ place.region }} · {{ place.category }}</div>
+        <h1>{{ place.name }}</h1>
+        <p>{{ place.description }}</p>
+      </div>
+    </section>
+    <div class="layout">
+      <div>
+        <section class="panel">
+          <h2>Why visit</h2>
+          <p>{{ place.description }} Plan around the season, choose a comfortable pace, and allow time to experience the local culture beyond the main sights.</p>
+        </section>
+        <section class="panel">
+          <h2>Highlights</h2>
+          <div class="list">
+            {% for item in place.highlights %}<span class="pill">{{ item }}</span>{% endfor %}
+          </div>
+          <h2 style="margin-top:27px">Things to do</h2>
+          <div class="list">
+            {% for item in place.activities %}<span class="pill">{{ item }}</span>{% endfor %}
+          </div>
+        </section>
+      </div>
+      <aside class="panel side">
+        <h2>Plan your visit</h2>
+        <div class="fact">
+          <h3>Ideal stay</h3>
+          <span>{{ place.days }}</span>
+        </div>
+        <div class="fact">
+          <h3>Best time to visit</h3>
+          <span>{{ place.best_time }}</span>
+        </div>
+        <div class="fact">
+          <h3>Typical budget</h3>
+          <span>{{ place.budget }}</span>
+        </div>
+        <div class="fact">
+          <h3>Expected weather</h3>
+          <span>{{ place.weather }}</span>
+        </div>
+      </aside>
+    </div>
+    {% if similar_places %}
+      <section class="panel similar">
+        <h2>Similar places</h2>
+        {% for item in similar_places %}<a href="{{ url_for('place_detail',slug=item.slug) }}">{{ item.name }} →</a>{% endfor %}
+      </section>
+    {% endif %}
+  </main>
+</body>
+</html>

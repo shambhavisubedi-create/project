@@ -26,9 +26,7 @@
   a { color: var(--primary-dark); text-decoration: none; }
   a:hover { text-decoration: underline; }
 
-  /* =====================================================================
-     TOP NAVIGATION BAR (same on every logged-in page in the real project)
-     ===================================================================== */
+  /* topbar */
   .topbar { background: var(--bg); border-bottom: 1px solid var(--border); }
   .topbar-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; gap: 24px; padding: 12px 20px; flex-wrap: wrap; }
   .brand { color: var(--charcoal); font-weight: 700; font-size: 1.2rem; font-family: var(--font-display); }
@@ -90,31 +88,16 @@
 </head>
 <body>
 
-  <!-- =====================================================================
-       TOP NAVIGATION BAR
-       "Dashboard" has the "active" class because this IS the dashboard
-       page. The other links (Explore Places, Travel Packages, etc.) point
-       to "#" because those extra pages aren't built in this simplified
-       demo -- build each one the same way dashboard.html was built
-       (a Flask route in app.py + a matching file in templates/) if you
-       want them to work too.
-       ===================================================================== -->
   <header class="topbar">
     <div class="topbar-inner">
       <a class="brand" href="/dashboard">GoGather</a>
       <nav class="topnav">
-       <a href="/explore_places">Explore Places</a>
-
-<a href="/packages">Travel Packages</a>
-
-<a href="/book_package">Book Package</a>
-
-<a href="/my_bookings">My Bookings</a>
-
-<a href="/travel_groups">Travel Groups</a>
-
-<a href="/profile">Profile</a>
-
+        <a href="/explore_places">Explore Places</a>
+        <a href="/packages">Travel Packages</a>
+        <a href="/book_package">Book Package</a>
+        <a href="/my_bookings">My Bookings</a>
+        <a href="/travel_groups">Travel Groups</a>
+        <a href="/profile">Profile</a>
       </nav>
       <div class="topbar-user">
         <span>Welcome, <strong>{{ session.username }}</strong>!</span>
