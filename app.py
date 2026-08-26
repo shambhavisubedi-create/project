@@ -13,8 +13,16 @@ app = Flask(__name__)
 app.secret_key = "any-random-string-goes-here"
 app.teardown_appcontext(close_db)
 
+          
+# MYSQL DATABASE CONNECTION
 
-# role = 0 -> traveller, role = 1 -> admin
+# DEMO USERS
+# user = 0 → Traveller
+# user = 1 → Admin
+
+
+# FEATURED PACKAGES
+
 
 FEATURED_PACKAGES = [
     {
@@ -24,6 +32,7 @@ FEATURED_PACKAGES = [
         "transport_mode": "bus",
         "price": 32500
     },
+
     {
         "name": "Chitwan Wildlife Safari",
         "duration_days": 3,
@@ -31,6 +40,7 @@ FEATURED_PACKAGES = [
         "transport_mode": "bus",
         "price": 15500
     },
+
     {
         "name": "Everest Base Camp Trek",
         "duration_days": 14,
@@ -56,13 +66,15 @@ PLACES = [
 ]
 
 
-# Extra itinerary info shown alongside the packages stored in MySQL.
+# Extra itinerary information displayed with the packages stored in MySQL.
 PACKAGE_DETAILS = {
     1: {"tag": "Culture & lakes", "summary": "A balanced city and lakeside escape combining Kathmandu's heritage with Pokhara's mountain views.", "places": ["Kathmandu", "Patan", "Pokhara", "Phewa Lake"], "activities": ["Heritage walk", "Lakeside boating", "Sunrise viewpoint"], "includes": ["Hotel stay", "Private transfers", "Daily breakfast", "Local guide"]},
     2: {"tag": "Wildlife escape", "summary": "A relaxed jungle break with guided wildlife experiences and a warm introduction to Tharu culture.", "places": ["Sauraha", "Chitwan National Park", "Rapti River"], "activities": ["Jeep safari", "Canoe ride", "Tharu cultural evening"], "includes": ["Hotel stay", "Safari permits", "Breakfast and dinner", "Naturalist guide"]},
     3: {"tag": "High Himalayan trek", "summary": "A carefully paced Everest journey through Sherpa villages, dramatic valleys and iconic mountain viewpoints.", "places": ["Lukla", "Namche Bazaar", "Tengboche", "Everest Base Camp"], "activities": ["Guided trek", "Acclimatisation hikes", "Mountain photography"], "includes": ["Domestic flights", "Teahouse stays", "Trekking guide", "Required permits"]},
 }
 
+
+# FORMAT NPR
 
 def format_npr(amount):
     return "Rs {:,.0f}".format(amount)
@@ -80,21 +92,27 @@ def ensure_group_columns():
         execute("ALTER TABLE travel_groups ADD COLUMN description TEXT NULL")
 
 
+# LANDING PAGE
+
 @app.route("/")
 def landing():
     return render_template("landing.html")
 
 
+# LOGIN PAGE
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
+
     error = None
 
     if request.method == "POST":
+
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
 
-        # The form accepts either a username or an email address.
-        user = query(
+        # The form accepts either a username or email address.
+        logged_in_user = query(
             """
             SELECT id, username, password_hash, role
             FROM users
@@ -105,94 +123,243 @@ def login():
             fetch="one",
         )
 
-        if user and check_password_hash(user["password_hash"], password):
-            session["user_id"] = user["id"]
-            session["username"] = user["username"]
-            session["user"] = user["role"]
+        # LOGIN SUCCESSFUL
 
-            if user["role"] == 0:
-                return redirect(url_for("dashboard"))
-            else:
-                return redirect(url_for("admin_dashboard"))
+        if logged_in_user and check_password_hash(
+            logged_in_user["password_hash"], password
+        ):
+
+            # Store login information
+            session["user_id"] = logged_in_user["id"]
+            session["username"] = logged_in_user["username"]
+            session["user"] = logged_in_user["role"]
+
+            # USER = 0 → TRAVELLER
+
+            if logged_in_user["role"] == 0:
+
+                return redirect(
+                    url_for("dashboard")
+                )
+
+            
+            # USER = 1 → ADMIN
+
+            elif logged_in_user["role"] == 1:
+
+                return redirect(
+                    url_for("admin_dashboard")
+                )
+
+        # LOGIN FAILED
+
         else:
+
             error = "Invalid username or password."
 
-    return render_template("login.html", error=error)
+    return render_template(
+        "login.html",
+        error=error
+    )
 
+
+# REGISTER PAGE
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
+
     error = None
 
     if request.method == "POST":
-        full_name = request.form.get("full_name", "").strip()
-        username = request.form.get("username", "").strip()
-        email = request.form.get("email", "").strip()
-        phone = request.form.get("phone", "").strip()
-        password = request.form.get("password", "")
-        confirm_password = request.form.get("confirm_password", "")
 
-        if not (full_name and username and email and password and confirm_password):
+        full_name = request.form.get(
+            "full_name", ""
+        ).strip()
+
+        username = request.form.get(
+            "username", ""
+        ).strip()
+
+        email = request.form.get(
+            "email", ""
+        ).strip()
+
+        phone = request.form.get("phone", "").strip()
+
+        password = request.form.get(
+            "password", ""
+        )
+
+        confirm_password = request.form.get(
+            "confirm_password", ""
+        )
+
+        # REQUIRED FIELDS
+
+        if not (
+            full_name
+            and username
+            and email
+            and password
+            and confirm_password
+        ):
+
             error = "Please fill in every required field."
+
+        # PASSWORD MATCH
+
         elif password != confirm_password:
+
             error = "Password and Confirm Password don't match."
+
+        # PASSWORD LENGTH
+
         elif len(password) < 8:
+
             error = "Password must be at least 8 characters long."
+
+        # PHONE FORMAT
+
+        elif phone and not (phone.isdigit() and len(phone) == 10):
+
+            error = "Phone number must be a 10 digit number."
+
         else:
+
             try:
+
                 # New registrations are always travellers (role = 0).
+
                 execute(
                     """
                     INSERT INTO users
                         (full_name, username, email, phone, password_hash, role)
                     VALUES (%s, %s, %s, %s, %s, %s)
                     """,
-                    (full_name, username, email, phone or None, generate_password_hash(password), 0),
+                    (
+                        full_name,
+                        username,
+                        email,
+                        phone or None,
+                        generate_password_hash(password),
+                        0,
+                    ),
                 )
-            except IntegrityError:
-                error = "That username or email address is already registered."
+
+            except IntegrityError as e:
+
+                # MySQL tells us which unique column caused the clash
+
+                if "phone" in str(e):
+
+                    error = "That phone number is already registered."
+
+                else:
+
+                    error = "That username or email address is already registered."
+
             else:
+
                 return redirect(url_for("login"))
 
-    return render_template("register.html", error=error)
+    return render_template(
+        "register.html",
+        error=error
+    )
 
+
+# TRAVELLER DASHBOARD
 
 @app.route("/dashboard")
 def dashboard():
+
+    # User must be logged in
     if "username" not in session:
-        return redirect(url_for("login"))
+
+        return redirect(
+            url_for("login")
+        )
+
+    # Only Traveller can access this page
     if session.get("user") != 0:
-        return redirect(url_for("admin_dashboard"))
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
+    # Counts are pulled live from the traveller's own data, not hardcoded.
+
+    bookings_row = query(
+        "SELECT COUNT(*) AS total FROM bookings WHERE user_id = %s",
+        (session["user_id"],),
+        fetch="one",
+    )
+
+    groups_row = query(
+        "SELECT COUNT(*) AS total FROM group_members WHERE user_id = %s",
+        (session["user_id"],),
+        fetch="one",
+    )
 
     return render_template(
         "dashboard.html",
-        my_bookings_count=2,
-        my_groups_count=1,
+
+        my_bookings_count=bookings_row["total"],
+
+        my_groups_count=groups_row["total"],
+
         featured_packages=FEATURED_PACKAGES,
-        username=session["username"],
+
+        username=session["username"]
     )
 
+
+# ADMIN DASHBOARD
 
 @app.route("/admin-dashboard")
 def admin_dashboard():
+
+    # User must be logged in
     if "username" not in session:
-        return redirect(url_for("login"))
+
+        return redirect(
+            url_for("login")
+        )
+
+    # Only Admin can access this page
     if session.get("user") != 1:
-        return redirect(url_for("dashboard"))
+
+        return redirect(
+            url_for("dashboard")
+        )
 
     return render_template(
         "admin_dashboard.html",
+
         username=session["username"],
-        featured_packages=FEATURED_PACKAGES,
+
+        featured_packages=FEATURED_PACKAGES
     )
 
 
+# TRAVEL PACKAGES - TRAVELLER
+
 @app.route("/packages")
 def packages():
+
+    # User must be logged in
     if "username" not in session:
-        return redirect(url_for("login"))
+
+        return redirect(
+            url_for("login")
+        )
+
+    # Only Traveller
     if session.get("user") != 0:
-        return redirect(url_for("admin_dashboard"))
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
 
     search = request.args.get("search", "").strip()
     hotel_type = request.args.get("hotel_type", "")
@@ -247,8 +414,11 @@ def package_detail(package_id):
 
 @app.route("/explore_places")
 def explore_places():
+
     if "username" not in session:
         return redirect(url_for("login"))
+
+    # Only traveller can access this page
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
@@ -294,61 +464,151 @@ def place_detail(slug):
     )
 
 
+# BOOK PACKAGE
+
+
 @app.route("/book_package", methods=["GET", "POST"])
 def book_package():
+
     if "username" not in session:
         return redirect(url_for("login"))
+
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
     package_id = request.values.get("package_id", type=int)
-    package = query("SELECT id, name, duration_days, hotel_type, transport_mode, price FROM packages WHERE id = %s", (package_id,), fetch="one") if package_id else None
+
+    package = query(
+        "SELECT id, name, duration_days, hotel_type, transport_mode, price FROM packages WHERE id = %s",
+        (package_id,), fetch="one",
+    ) if package_id else None
+
     if request.method == "POST":
+
         travel_date = request.form.get("travel_date", "")
         phone = request.form.get("phone", "").strip()
+
         try:
             travellers = int(request.form.get("travellers", "0"))
         except ValueError:
             travellers = 0
-        if package is None or travel_date < date.today().isoformat() or not phone or not 1 <= travellers <= 20:
+
+        # A booking needs a real package, a future date, a phone number,
+        # and a sensible traveller count.
+
+        if (
+            package is None
+            or travel_date < date.today().isoformat()
+            or not phone
+            or not 1 <= travellers <= 20
+        ):
+
             flash("Please complete all booking details with a valid future travel date.", "error")
+
         else:
-            execute("INSERT INTO bookings (user_id, package_id, package_name, travel_date, travellers, phone, price, status) VALUES (%s, %s, %s, %s, %s, %s, %s, 'Confirmed')", (session["user_id"], package["id"], package["name"], travel_date, travellers, phone, package["price"] * travellers))
+
+            execute(
+                """
+                INSERT INTO bookings
+                    (user_id, package_id, package_name, travel_date, travellers, phone, price, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 'Confirmed')
+                """,
+                (
+                    session["user_id"],
+                    package["id"],
+                    package["name"],
+                    travel_date,
+                    travellers,
+                    phone,
+                    package["price"] * travellers,
+                ),
+            )
+
             flash("Your booking is confirmed.", "success")
+
             return redirect(url_for("my_bookings"))
-    return render_template("book_package.html", package=package, packages=query("SELECT id, name, duration_days, price FROM packages ORDER BY price"), today=date.today().isoformat())
+
+    return render_template(
+        "book_package.html",
+        package=package,
+        packages=query("SELECT id, name, duration_days, price FROM packages ORDER BY price"),
+        today=date.today().isoformat(),
+    )
+
+
+# MY BOOKINGS
 
 
 @app.route("/my_bookings")
 def my_bookings():
+
     if "username" not in session:
         return redirect(url_for("login"))
+
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
-    bookings = query("SELECT id, package_name, travel_date, travellers, phone, price, status, created_at FROM bookings WHERE user_id = %s ORDER BY created_at DESC", (session["user_id"],))
-    return render_template("my_bookings.html", bookings=bookings)
+    bookings = query(
+        """
+        SELECT id, package_name, travel_date, travellers, phone, price, status, created_at
+        FROM bookings
+        WHERE user_id = %s
+        ORDER BY created_at DESC
+        """,
+        (session["user_id"],),
+    )
+
+    # Split into what's still ahead versus what the traveller has already
+    # been on, so the page can show trip history separately from upcoming
+    # bookings.
+
+    today = date.today()
+
+    upcoming_bookings = [b for b in bookings if b["travel_date"] >= today]
+    past_bookings = [b for b in bookings if b["travel_date"] < today]
+
+    return render_template(
+        "my_bookings.html",
+        upcoming_bookings=upcoming_bookings,
+        past_bookings=past_bookings,
+    )
 
 
 @app.route("/my_bookings/<int:booking_id>/cancel", methods=["POST"])
 def cancel_booking(booking_id):
+
     if "user_id" not in session or session.get("user") != 0:
         return redirect(url_for("login"))
-    booking = query("SELECT id, status FROM bookings WHERE id = %s AND user_id = %s", (booking_id, session["user_id"]), fetch="one")
+
+    booking = query(
+        "SELECT id, status FROM bookings WHERE id = %s AND user_id = %s",
+        (booking_id, session["user_id"]), fetch="one",
+    )
+
     if booking is None:
         flash("Booking not found.", "error")
+
     elif booking["status"] == "Cancelled":
         flash("This booking has already been cancelled.", "error")
+
     else:
-        execute("UPDATE bookings SET status = 'Cancelled' WHERE id = %s AND user_id = %s", (booking_id, session["user_id"]))
+        execute(
+            "UPDATE bookings SET status = 'Cancelled' WHERE id = %s AND user_id = %s",
+            (booking_id, session["user_id"]),
+        )
         flash("Your booking has been cancelled.", "success")
+
     return redirect(url_for("my_bookings"))
 
 
+# TRAVEL GROUPS
+
 @app.route("/travel_groups")
 def travel_groups():
+
     if "username" not in session:
         return redirect(url_for("login"))
+
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
@@ -434,45 +694,89 @@ def join_travel_group(group_id):
     return redirect(url_for("travel_groups"))
 
 
+# PROFILE
+
 @app.route("/profile", methods=["GET", "POST"])
 def profile():
+
     if "username" not in session:
         return redirect(url_for("login"))
+
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
     if request.method == "POST":
+
         full_name = request.form.get("full_name", "").strip()
         email = request.form.get("email", "").strip()
         phone = request.form.get("phone", "").strip()
+
         if not full_name or not email:
+
             flash("Full name and email are required.", "error")
+
         else:
+
             try:
-                execute("UPDATE users SET full_name=%s, email=%s, phone=%s WHERE id=%s", (full_name, email, phone or None, session["user_id"]))
-                flash("Your profile has been updated.", "success")
-                return redirect(url_for("profile"))
+                execute(
+                    "UPDATE users SET full_name = %s, email = %s, phone = %s WHERE id = %s",
+                    (full_name, email, phone or None, session["user_id"]),
+                )
+
             except IntegrityError:
+
                 flash("That email address is already in use.", "error")
 
-    user = query("SELECT full_name, username, email, phone, created_at FROM users WHERE id=%s", (session["user_id"],), fetch="one")
+            else:
+
+                flash("Your profile has been updated.", "success")
+
+                return redirect(url_for("profile"))
+
+    user = query(
+        "SELECT full_name, username, email, phone, created_at FROM users WHERE id = %s",
+        (session["user_id"],), fetch="one",
+    )
+
     return render_template("profile.html", user=user)
 
 
+# MANAGE PACKAGES - ADMIN
+
 @app.route("/admin/packages")
 def admin_packages():
+
+    # User must be logged in
     if "username" not in session:
-        return redirect(url_for("login"))
+
+        return redirect(
+            url_for("login")
+        )
+
+    # Only Admin
     if session.get("user") != 1:
-        return redirect(url_for("dashboard"))
 
-    return render_template("admin_packages.html", packages=FEATURED_PACKAGES)
+        return redirect(
+            url_for("dashboard")
+        )
 
+    return render_template(
+        "admin_packages.html",
+
+        packages=FEATURED_PACKAGES
+    )
+
+
+# LOGOUT
 
 @app.route("/logout")
 def logout():
+
     session.clear()
-    return redirect(url_for("landing"))
+
+    return redirect(
+        url_for("landing")
+    )
 
 
 if __name__ == "__main__":

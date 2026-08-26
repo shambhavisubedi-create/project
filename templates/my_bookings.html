@@ -196,7 +196,8 @@
         <div class="flash">{{ m }}</div>
       {% endfor %}
     {% endwith %}
-    {% for booking in bookings %}
+    <h2>Upcoming trips</h2>
+    {% for booking in upcoming_bookings %}
       <article class="card">
         <div class="top">
           <h2>{{ booking.package_name }}</h2>
@@ -215,9 +216,29 @@
       </article>
     {% else %}
       <div class="empty">
-        <h2>No bookings yet.</h2>
+        <h2>No upcoming trips.</h2>
         <p>When you book a package, it will appear here.</p>
         <a href="{{ url_for('packages') }}">Explore packages</a>
+      </div>
+    {% endfor %}
+
+    <h2 style="margin-top:34px">Travel history</h2>
+    {% for booking in past_bookings %}
+      <article class="card">
+        <div class="top">
+          <h2>{{ booking.package_name }}</h2>
+          <span class="status {% if booking.status=='Cancelled' %}cancelled{% endif %}">{{ booking.status }}</span>
+        </div>
+        <div class="facts">
+          <div class="fact">{{ booking.travel_date.strftime('%d %b %Y') }}<span>Travel date</span></div>
+          <div class="fact">{{ booking.travellers }} traveller{{ '' if booking.travellers==1 else 's' }}<span>Guests</span></div>
+          <div class="fact">{{ booking.price|npr }}<span>Total amount</span></div>
+        </div>
+      </article>
+    {% else %}
+      <div class="empty">
+        <h2>No past trips yet.</h2>
+        <p>Trips you've already travelled will show up here once their date has passed.</p>
       </div>
     {% endfor %}
   </main>
