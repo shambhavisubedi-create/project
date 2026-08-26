@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <linearGradient id="skyN" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f8dcc8"/>
+      <stop offset="45%" stop-color="#f6d7df"/>
+      <stop offset="100%" stop-color="#fdf3ea"/>
+    </linearGradient>
+    <linearGradient id="farN" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0c6cb"/>
+      <stop offset="100%" stop-color="#e7b9bd"/>
+    </linearGradient>
+    <linearGradient id="midN" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#b95a71"/>
+      <stop offset="100%" stop-color="#a9455c"/>
+    </linearGradient>
+    <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#e7ac52" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#e7ac52" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect x="0" y="0" width="900" height="700" fill="url(#skyN)"/>
+
+  <!-- sun with soft glow -->
+  <circle cx="676" cy="132" r="150" fill="url(#sunGlow)"/>
+  <circle cx="676" cy="132" r="46" fill="#e7ac52"/>
+
+  <!-- flying birds -->
+  <g stroke="#2c2420" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.55">
+    <path d="M108,96 q10,-12 20,0 q10,-12 20,0"/>
+    <path d="M168,132 q8,-10 16,0 q8,-10 16,0"/>
+    <path d="M64,150 q7,-9 14,0 q7,-9 14,0"/>
+  </g>
+
+  <!-- dotted flight path with paper plane -->
+  <path d="M40,300 C220,260 300,140 540,108" fill="none" stroke="#2c2420" stroke-width="2.5" stroke-dasharray="1,10" stroke-linecap="round" opacity="0.45"/>
+  <g transform="translate(556,101) rotate(-24)" fill="#2c2420" opacity="0.85">
+    <path d="M0,0 L34,7 L0,14 L7,7 Z"/>
+  </g>
+
+  <!-- far Himalaya range with snow caps -->
+  <polygon fill="url(#farN)" points="0,380 100,255 220,365 340,220 470,375 600,245 730,385 860,265 900,325 900,700 0,700"/>
+  <g fill="#fbf1ea" opacity="0.9">
+    <polygon points="100,255 132,298 66,298"/>
+    <polygon points="340,220 377,270 300,270"/>
+    <polygon points="600,245 634,293 564,293"/>
+    <polygon points="860,265 891,308 826,308"/>
+  </g>
+
+  <!-- mid hill range -->
+  <polygon fill="url(#midN)" points="0,470 160,345 320,460 480,335 660,470 820,355 900,425 900,700 0,700"/>
+
+  <!-- terraced hills -->
+  <path d="M0,560 C120,522 220,542 340,508 C460,474 560,512 680,488 C780,468 850,502 900,484 L900,700 L0,700 Z" fill="#8a3549" opacity="0.92"/>
+  <path d="M0,622 C130,598 260,617 400,588 C540,559 650,602 780,578 C830,568 870,588 900,578 L900,700 L0,700 Z" fill="#2c2420" opacity="0.95"/>
+
+  <!-- pagoda temple silhouette (Kathmandu Durbar Square style) -->
+  <g fill="#2c2420">
+    <rect x="405" y="475" width="90" height="90"/>
+    <polygon points="382,475 518,475 496,438 404,438"/>
+    <rect x="418" y="420" width="64" height="21"/>
+    <polygon points="398,420 502,420 484,390 416,390"/>
+    <rect x="430" y="365" width="40" height="27"/>
+    <polygon points="416,365 484,365 466,340 434,340"/>
+    <rect x="446" y="322" width="8" height="20"/>
+    <circle cx="450" cy="316" r="6"/>
+  </g>
+  <rect x="440" y="524" width="20" height="41" fill="#1c1512"/>
+
+  <!-- prayer-flag bunting strung across the sky -->
+  <path d="M40,182 C260,128 620,242 860,158" fill="none" stroke="#2c2420" stroke-width="2" opacity="0.4"/>
+  <g opacity="0.92">
+    <polygon points="90,184 108,184 99,204" fill="#a9455c"/>
+    <polygon points="160,169 178,170 168,190" fill="#fbe7e3"/>
+    <polygon points="230,158 248,160 237,180" fill="#2c2420"/>
+    <polygon points="300,152 318,154 306,174" fill="#a9455c"/>
+    <polygon points="370,151 388,153 376,173" fill="#fbe7e3"/>
+    <polygon points="440,155 458,158 446,178" fill="#2c2420"/>
+    <polygon points="510,163 528,166 516,186" fill="#a9455c"/>
+    <polygon points="580,175 598,178 586,198" fill="#fbe7e3"/>
+    <polygon points="650,189 668,193 656,213" fill="#2c2420"/>
+    <polygon points="720,203 738,207 726,227" fill="#a9455c"/>
+    <polygon points="790,215 808,219 796,239" fill="#fbe7e3"/>
+  </g>
+</svg>

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoGather - My Profile</title>
+<style>
+  :root {
+    --primary: #a9455c;
+    --primary-dark: #8a3549;
+    --primary-light: #fbe4e6;
+    --charcoal: #2c2420;
+    --text: #4a3d38;
+    --text-muted: #8a7b73;
+    --border: #f0e3d5;
+    --bg: #fdf3ea;
+    --white: #fff;
+    --font-display: Georgia, serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: Arial, sans-serif; }
+
+  .navbar { border-bottom: 1px solid var(--border); }
+  .navbar-inner { max-width: 1100px; margin: auto; padding: 18px 25px; display: flex; justify-content: space-between; }
+  .brand { font-family: var(--font-display); font-size: 1.35rem; font-weight: bold; color: var(--charcoal); text-decoration: none; }
+  .nav-links a { margin-left: 15px; color: var(--text); text-decoration: none; }
+
+  .container { max-width: 650px; margin: auto; padding: 45px 25px; }
+  .profile-card { background: white; border: 1px solid var(--border); border-radius: 18px; padding: 30px; }
+
+  .avatar {
+    width: 80px;
+    height: 80px;
+    background: var(--primary-light);
+    color: var(--primary-dark);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 30px;
+    margin-bottom: 20px;
+  }
+
+  h1 { font-family: var(--font-display); color: var(--charcoal); }
+
+  .form-group { margin-bottom: 18px; }
+  label { display: block; font-weight: bold; margin-bottom: 7px; }
+  input { width: 100%; padding: 11px; border: 1px solid var(--border); border-radius: 10px; }
+
+  .btn {
+    width: 100%;
+    padding: 11px;
+    border: none;
+    border-radius: 22px;
+    background: var(--primary);
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<header class="navbar">
+  <div class="navbar-inner">
+    <a href="/dashboard" class="brand">GoGather</a>
+    <nav class="nav-links">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/packages">Packages</a>
+      <a href="/logout">Logout</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+  <div class="profile-card">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <p style="padding: 10px; border-radius: 8px; background: {% if category == 'success' %}#e5f3ec{% else %}#f9e6e8{% endif %}; color: {% if category == 'success' %}#286650{% else %}#9b3544{% endif %};">{{ message }}</p>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="avatar">👤</div>
+    <h1>My Profile</h1>
+
+    <form method="POST" action="/profile">
+      <div class="form-group">
+        <label for="full_name">Full Name</label>
+        <input type="text" id="full_name" name="full_name" value="{{ user.full_name or '' }}">
+      </div>
+
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" value="{{ user.username }}" readonly>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" value="{{ user.email or '' }}">
+      </div>
+
+      <div class="form-group">
+        <label for="phone">Phone</label>
+        <input type="tel" id="phone" name="phone" value="{{ user.phone or '' }}">
+      </div>
+
+      <button type="submit" class="btn">Save Changes</button>
+    </form>
+  </div>
+</main>
+
+</body>
+</html>
