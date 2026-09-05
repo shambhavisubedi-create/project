@@ -120,6 +120,10 @@
       background: #e5f3ec;
       color: #286650
     }
+    .pending, .cancel-requested {
+      background: #fbe4e6;
+      color: #8a3549
+    }
     .facts {
       display: grid;
       grid-template-columns: repeat(3,1fr);
@@ -205,14 +209,14 @@
       <article class="card">
         <div class="top">
           <h2>{{ booking.package_name }}</h2>
-          <span class="status {{ 'cancelled' if booking.status=='Cancelled' else 'completed' if booking.status=='Completed' else '' }}">{{ booking.status }}</span>
+          <span class="status {{ 'cancelled' if booking.status=='Cancelled' else 'completed' if booking.status=='Completed' else 'pending' if booking.status=='Pending' else 'cancel-requested' if booking.status=='Cancel Requested' else '' }}">{{ booking.status }}</span>
         </div>
         <div class="facts">
           <div class="fact">{{ booking.travel_date.strftime('%d %b %Y') }}<span>Travel date</span></div>
           <div class="fact">{{ booking.travellers }} traveller{{ '' if booking.travellers==1 else 's' }}<span>Guests</span></div>
           <div class="fact">{{ booking.price|npr }}<span>Total amount</span></div>
         </div>
-        {% if booking.status!='Cancelled' %}
+        {% if booking.status not in ('Cancelled', 'Cancel Requested') %}
           <form method="post" action="{{ url_for('cancel_booking',booking_id=booking.id) }}" onsubmit="return confirm('Cancel this booking?')">
             <button class="cancel">Cancel booking</button>
           </form>
@@ -231,7 +235,7 @@
       <article class="card">
         <div class="top">
           <h2>{{ booking.package_name }}</h2>
-          <span class="status {{ 'cancelled' if booking.status=='Cancelled' else 'completed' if booking.status=='Completed' else '' }}">{{ booking.status }}</span>
+          <span class="status {{ 'cancelled' if booking.status=='Cancelled' else 'completed' if booking.status=='Completed' else 'pending' if booking.status=='Pending' else 'cancel-requested' if booking.status=='Cancel Requested' else '' }}">{{ booking.status }}</span>
         </div>
         <div class="facts">
           <div class="fact">{{ booking.travel_date.strftime('%d %b %Y') }}<span>Travel date</span></div>

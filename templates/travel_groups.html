@@ -359,7 +359,7 @@
             </div>
             <div>
               <label>Travel date</label>
-              <input type="date" name="travel_date" required>
+              <input type="date" name="travel_date" min="{{ today }}" max="{{ max_travel_date }}" required>
             </div>
             <div>
               <label>Maximum members</label>

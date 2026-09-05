@@ -43,7 +43,7 @@
   .flash.success { background: #e5f3ec; color: #286650; }
   .flash.error { background: #f9e6e8; color: #9b3544; }
 
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 28px; }
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; margin-bottom: 28px; }
   .stat-card { background: var(--white); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 5px 18px rgba(80, 50, 40, 0.05); }
   .stat-card h3 { margin: 0 0 8px; font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
   .stat-number { font-family: var(--font-display); font-size: 1.8rem; color: var(--charcoal); font-weight: 700; }
@@ -60,6 +60,10 @@
   .btn:hover { background: var(--primary-dark); }
   .btn-outline { background: none; color: var(--primary-dark); border: 1px solid var(--primary-light); padding: 9px 18px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; text-decoration: none; display: inline-block; }
   .btn-outline:hover { background: var(--primary-light); }
+
+  .status-heading { display: flex; align-items: center; gap: 10px; margin: 28px 0 4px; }
+  .status-heading:first-child { margin-top: 0; }
+  .status-heading-count { color: var(--text-muted); font-size: 0.85rem; font-weight: 600; }
 
   .booking-row { border-bottom: 1px solid var(--border); padding: 16px 0; }
   .booking-row:last-child { border-bottom: none; }
@@ -80,6 +84,19 @@
   .edit-form .field { min-width: 180px; }
 
   .empty { text-align: center; color: var(--text-muted); padding: 30px; }
+
+  .badge.pending { background: #fdead1; color: #8a5a1c; }
+  .badge.cancel-requested { background: #fbe4e6; color: var(--primary-dark); }
+
+  .action-row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .btn-approve { background: #286650; color: white; border: none; padding: 9px 18px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  .btn-approve:hover { background: #1f5140; }
+  .btn-decline { background: none; color: #9b3544; border: 1px solid #f0c6cb; padding: 9px 18px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  .btn-decline:hover { background: #f9e6e8; }
+
+  @media (max-width: 900px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
 
   @media (max-width: 700px) {
     .stats { grid-template-columns: 1fr; }
@@ -113,6 +130,14 @@
 
   <section class="stats">
     <div class="stat-card">
+      <h3>Pending</h3>
+      <div class="stat-number">{{ pending_count }}</div>
+    </div>
+    <div class="stat-card">
+      <h3>Cancel requests</h3>
+      <div class="stat-number">{{ cancel_requested_count }}</div>
+    </div>
+    <div class="stat-card">
       <h3>Confirmed</h3>
       <div class="stat-number">{{ confirmed_count }}</div>
     </div>
@@ -137,7 +162,7 @@
         <label for="status">Status</label>
         <select id="status" name="status">
           <option value="">All statuses</option>
-          {% for item in ['Confirmed', 'Completed', 'Cancelled'] %}
+          {% for item in ['Pending', 'Cancel Requested', 'Confirmed', 'Completed', 'Cancelled'] %}
             <option value="{{ item }}" {% if selected_status==item %}selected{% endif %}>{{ item }}</option>
           {% endfor %}
         </select>
@@ -156,43 +181,81 @@
   <section class="card">
     <h2>Bookings ({{ bookings|length }})</h2>
 
-    {% for booking in bookings %}
-      <div class="booking-row">
-        <div class="booking-top">
-          <div>
-            <div class="booking-name">{{ booking.package_name }}</div>
-            <div class="booking-meta">
-              Booked by {{ booking.traveller_name }} (@{{ booking.traveller_username }})
-              &middot; {{ booking.travel_date.strftime('%d %b %Y') }}
-              &middot; {{ booking.travellers }} traveller{{ '' if booking.travellers==1 else 's' }}
-              &middot; {{ booking.phone }}
-            </div>
-          </div>
-          <div class="booking-right">
-            <div class="booking-price">{{ booking.price|npr }}</div>
-            <span class="badge {{ booking.status|lower }}">{{ booking.status }}</span>
-          </div>
-        </div>
+    {% for status_name, status_bookings in grouped_bookings %}
+      <h3 class="status-heading">
+        <span class="badge {{ status_name|lower|replace(' ', '-') }}">{{ status_name }}</span>
+        <span class="status-heading-count">{{ status_bookings|length }}</span>
+      </h3>
 
-        <details class="edit-panel">
-          <summary>Update status</summary>
-          <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}" class="edit-form">
-            <input type="hidden" name="search" value="{{ search }}">
-            <input type="hidden" name="status_filter" value="{{ selected_status }}">
-            <div class="field">
-              <label>Booking status</label>
-              <select name="status">
-                {% for item in ['Confirmed', 'Completed', 'Cancelled'] %}
-                  <option value="{{ item }}" {% if booking.status==item %}selected{% endif %}>{{ item }}</option>
-                {% endfor %}
-              </select>
+      {% for booking in status_bookings %}
+        <div class="booking-row">
+          <div class="booking-top">
+            <div>
+              <div class="booking-name">{{ booking.package_name }}</div>
+              <div class="booking-meta">
+                Booked by {{ booking.traveller_name }} (@{{ booking.traveller_username }})
+                &middot; {{ booking.travel_date.strftime('%d %b %Y') }}
+                &middot; {{ booking.travellers }} traveller{{ '' if booking.travellers==1 else 's' }}
+                &middot; {{ booking.phone }}
+              </div>
             </div>
-            <div class="field" style="flex: 0;">
-              <button type="submit" class="btn-outline">Save</button>
+            <div class="booking-right">
+              <div class="booking-price">{{ booking.price|npr }}</div>
             </div>
-          </form>
-        </details>
-      </div>
+          </div>
+
+          {% if booking.status == 'Pending' %}
+            <div class="action-row">
+              <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}">
+                <input type="hidden" name="status" value="Confirmed">
+                <input type="hidden" name="search" value="{{ search }}">
+                <input type="hidden" name="status_filter" value="{{ selected_status }}">
+                <button type="submit" class="btn-approve">Confirm booking</button>
+              </form>
+              <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}">
+                <input type="hidden" name="status" value="Cancelled">
+                <input type="hidden" name="search" value="{{ search }}">
+                <input type="hidden" name="status_filter" value="{{ selected_status }}">
+                <button type="submit" class="btn-decline">Decline</button>
+              </form>
+            </div>
+          {% elif booking.status == 'Cancel Requested' %}
+            <div class="action-row">
+              <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}">
+                <input type="hidden" name="status" value="Cancelled">
+                <input type="hidden" name="search" value="{{ search }}">
+                <input type="hidden" name="status_filter" value="{{ selected_status }}">
+                <button type="submit" class="btn-approve">Approve cancellation</button>
+              </form>
+              <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}">
+                <input type="hidden" name="status" value="Confirmed">
+                <input type="hidden" name="search" value="{{ search }}">
+                <input type="hidden" name="status_filter" value="{{ selected_status }}">
+                <button type="submit" class="btn-decline">Keep booking</button>
+              </form>
+            </div>
+          {% endif %}
+
+          <details class="edit-panel">
+            <summary>Update status</summary>
+            <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}" class="edit-form">
+              <input type="hidden" name="search" value="{{ search }}">
+              <input type="hidden" name="status_filter" value="{{ selected_status }}">
+              <div class="field">
+                <label>Booking status</label>
+                <select name="status">
+                  {% for item in ['Confirmed', 'Completed', 'Cancelled'] %}
+                    <option value="{{ item }}" {% if booking.status==item %}selected{% endif %}>{{ item }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="field" style="flex: 0;">
+                <button type="submit" class="btn-outline">Save</button>
+              </div>
+            </form>
+          </details>
+        </div>
+      {% endfor %}
     {% else %}
       <div class="empty">No bookings match your search.</div>
     {% endfor %}

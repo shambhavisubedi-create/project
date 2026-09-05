@@ -565,7 +565,7 @@ def book_package():
                 """
                 INSERT INTO bookings
                     (user_id, package_id, package_name, travel_date, travellers, phone, price, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, 'Confirmed')
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 'Pending')
                 """,
                 (
                     session["user_id"],
@@ -578,7 +578,7 @@ def book_package():
                 ),
             )
 
-            flash("Your booking is confirmed.", "success")
+            flash("Your booking request has been submitted and is awaiting admin confirmation.", "success")
 
             return redirect(url_for("my_bookings"))
 
@@ -647,18 +647,30 @@ def cancel_booking(booking_id):
     elif booking["status"] == "Cancelled":
         flash("This booking has already been cancelled.", "error")
 
-    else:
+    elif booking["status"] == "Cancel Requested":
+        flash("You've already requested cancellation for this booking.", "error")
+
+    elif booking["status"] == "Pending":
+        # Nothing has been confirmed yet, so the traveller can withdraw the
+        # request immediately -- there's nothing for admin to undo.
         execute(
             "UPDATE bookings SET status = 'Cancelled' WHERE id = %s AND user_id = %s",
             (booking_id, session["user_id"]),
         )
         flash("Your booking has been cancelled.", "success")
 
+    else:
+        execute(
+            "UPDATE bookings SET status = 'Cancel Requested' WHERE id = %s AND user_id = %s",
+            (booking_id, session["user_id"]),
+        )
+        flash("Your cancellation request has been submitted and is awaiting admin approval.", "success")
+
     return redirect(url_for("my_bookings"))
 
 
 # TRAVEL GROUPS
-
+MAX_GROUP_DAYS_AHEAD = 180
 @app.route("/travel_groups")
 def travel_groups():
 
@@ -685,7 +697,9 @@ def travel_groups():
         params.extend([f"%{destination}%", f"%{destination}%"])
     sql += " GROUP BY tg.id ORDER BY tg.travel_date ASC"
     groups = query(sql, tuple(params))
-    return render_template("travel_groups.html", groups=groups, destination=destination)
+    max_travel_date = (date.today() + timedelta(days=MAX_GROUP_DAYS_AHEAD)).isoformat()
+    return render_template("travel_groups.html", groups=groups, destination=destination, today=date.today().isoformat(), max_travel_date=max_travel_date)
+
 
 
 @app.route("/travel_groups/create", methods=["POST"])
@@ -703,8 +717,15 @@ def create_travel_group():
     except ValueError:
         max_members = 0
 
-    if not name or not destination or not travel_date or not (2 <= max_members <= 30):
-        flash("Complete all required fields and choose a group size from 2 to 30.", "error")
+    max_travel_date = (date.today() + timedelta(days=MAX_GROUP_DAYS_AHEAD)).isoformat()
+
+    if (
+        not name or not destination or not travel_date
+        or travel_date < date.today().isoformat()
+        or travel_date > max_travel_date
+        or not (2 <= max_members <= 30)
+    ):
+        flash("Choose a travel date within the next 6 months and a group size from 2 to 30.", "error")
         return redirect(url_for("travel_groups"))
 
     group_id = execute(
@@ -728,7 +749,7 @@ def join_travel_group(group_id):
         return redirect(url_for("login"))
 
     group = query(
-        """SELECT tg.max_members, COUNT(gm.id) AS member_count
+        """SELECT tg.max_members, tg.travel_date, COUNT(gm.id) AS member_count
            FROM travel_groups tg LEFT JOIN group_members gm ON gm.group_id = tg.id
            WHERE tg.id = %s GROUP BY tg.id""",
         (group_id,), fetch="one",
@@ -741,6 +762,8 @@ def join_travel_group(group_id):
         flash("That travel group is no longer available.", "error")
     elif already_joined:
         flash("You have already joined this group.", "error")
+    elif group["travel_date"] < date.today():
+        flash("This group's trip has already happened, so it's no longer accepting new members.", "error")
     elif group["member_count"] >= group["max_members"]:
         flash("This group is already full.", "error")
     else:
@@ -1114,6 +1137,17 @@ def admin_bookings():
 
     bookings = query(sql, tuple(params))
 
+    # Group by status (in a fixed order) instead of one interleaved list, so
+    # confirmed/completed/cancelled bookings don't get mixed together when
+    # the admin isn't filtering to a single status.
+    # Pending bookings and cancel requests need admin action, so they're
+    # grouped ahead of the settled statuses.
+    grouped_bookings = []
+    for status_name in ("Pending", "Cancel Requested", "Confirmed", "Completed", "Cancelled"):
+        matches = [b for b in bookings if b["status"] == status_name]
+        if matches:
+            grouped_bookings.append((status_name, matches))
+
     # Status counts are pulled independently of the filters above so the
     # summary cards always reflect every booking, not just the filtered view.
 
@@ -1123,8 +1157,11 @@ def admin_bookings():
     return render_template(
         "admin_bookings.html",
         bookings=bookings,
+        grouped_bookings=grouped_bookings,
         search=search,
         selected_status=status_filter,
+        pending_count=status_counts.get("Pending", 0),
+        cancel_requested_count=status_counts.get("Cancel Requested", 0),
         confirmed_count=status_counts.get("Confirmed", 0),
         completed_count=status_counts.get("Completed", 0),
         cancelled_count=status_counts.get("Cancelled", 0),
