@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoGather - Manage Bookings</title>
+<style>
+  :root {
+    --primary: #a9455c;
+    --primary-dark: #8a3549;
+    --primary-light: #fbe4e6;
+    --charcoal: #2c2420;
+    --text: #4a3d38;
+    --text-muted: #8a7b73;
+    --border: #f0e3d5;
+    --bg: #fdf3ea;
+    --white: #ffffff;
+    --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .navbar { background: var(--bg); border-bottom: 1px solid var(--border); }
+  .navbar-inner { max-width: 1200px; margin: 0 auto; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; color: var(--charcoal); text-decoration: none; }
+  .nav-links a { color: var(--text); font-weight: 600; font-size: 0.92rem; padding: 8px 16px; border-radius: 999px; text-decoration: none; }
+  .nav-links a:hover { background: var(--primary-light); }
+  .logout-btn { background: var(--primary); color: white !important; padding: 9px 22px !important; border-radius: 999px; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 45px 28px; }
+
+  h1 { font-family: var(--font-display); color: var(--charcoal); font-size: 2rem; margin: 0 0 8px; }
+  .subtitle { color: var(--text-muted); margin: 0 0 30px; }
+
+  .flash { padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; font-size: 0.9rem; }
+  .flash.success { background: #e5f3ec; color: #286650; }
+  .flash.error { background: #f9e6e8; color: #9b3544; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 28px; }
+  .stat-card { background: var(--white); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 5px 18px rgba(80, 50, 40, 0.05); }
+  .stat-card h3 { margin: 0 0 8px; font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
+  .stat-number { font-family: var(--font-display); font-size: 1.8rem; color: var(--charcoal); font-weight: 700; }
+
+  .card { background: var(--white); border: 1px solid var(--border); border-radius: 16px; padding: 26px; box-shadow: 0 5px 18px rgba(80, 50, 40, 0.05); margin-bottom: 28px; }
+  .card h2 { font-family: var(--font-display); color: var(--charcoal); font-size: 1.3rem; margin: 0 0 18px; }
+
+  .filter-form { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+  .filter-form .field { flex: 1; min-width: 180px; }
+  label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px; }
+  input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 0.9rem; font-family: inherit; }
+
+  .btn { display: inline-block; background: var(--primary); color: white; border: none; text-decoration: none; padding: 9px 18px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  .btn:hover { background: var(--primary-dark); }
+  .btn-outline { background: none; color: var(--primary-dark); border: 1px solid var(--primary-light); padding: 9px 18px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; text-decoration: none; display: inline-block; }
+  .btn-outline:hover { background: var(--primary-light); }
+
+  .booking-row { border-bottom: 1px solid var(--border); padding: 16px 0; }
+  .booking-row:last-child { border-bottom: none; }
+  .booking-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .booking-name { font-weight: 700; color: var(--charcoal); }
+  .booking-meta { color: var(--text-muted); font-size: 0.85rem; margin-top: 2px; }
+  .booking-price { font-weight: 700; color: var(--primary-dark); white-space: nowrap; }
+  .booking-right { display: flex; align-items: center; gap: 12px; }
+
+  .badge { padding: 6px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
+  .badge.confirmed { background: #fbe4e6; color: var(--primary-dark); }
+  .badge.completed { background: #e5f3ec; color: #286650; }
+  .badge.cancelled { background: #eee8e4; color: #736660; }
+
+  details.edit-panel { margin-top: 14px; }
+  details.edit-panel summary { cursor: pointer; color: var(--primary-dark); font-weight: 600; font-size: 0.85rem; }
+  .edit-form { margin-top: 12px; padding: 14px; background: var(--bg); border-radius: 10px; display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+  .edit-form .field { min-width: 180px; }
+
+  .empty { text-align: center; color: var(--text-muted); padding: 30px; }
+
+  @media (max-width: 700px) {
+    .stats { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="navbar">
+  <div class="navbar-inner">
+    <a href="/admin-dashboard" class="brand">GoGather</a>
+    <nav class="nav-links">
+      <a href="/admin-dashboard">Dashboard</a>
+      <a href="/admin/travellers">Travellers</a>
+      <a href="/admin/packages">Packages</a>
+      <a href="/logout" class="logout-btn">Logout</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+  <h1>Manage Bookings</h1>
+  <p class="subtitle">Review traveller bookings and keep their status up to date.</p>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <section class="stats">
+    <div class="stat-card">
+      <h3>Confirmed</h3>
+      <div class="stat-number">{{ confirmed_count }}</div>
+    </div>
+    <div class="stat-card">
+      <h3>Completed</h3>
+      <div class="stat-number">{{ completed_count }}</div>
+    </div>
+    <div class="stat-card">
+      <h3>Cancelled</h3>
+      <div class="stat-number">{{ cancelled_count }}</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Find a booking</h2>
+    <form method="GET" action="{{ url_for('admin_bookings') }}" class="filter-form">
+      <div class="field">
+        <label for="search">Traveller or package</label>
+        <input type="text" id="search" name="search" value="{{ search }}" placeholder="Search by name, username or package">
+      </div>
+      <div class="field">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          <option value="">All statuses</option>
+          {% for item in ['Confirmed', 'Completed', 'Cancelled'] %}
+            <option value="{{ item }}" {% if selected_status==item %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field" style="flex: 0;">
+        <button type="submit" class="btn">Filter</button>
+      </div>
+      {% if search or selected_status %}
+        <div class="field" style="flex: 0;">
+          <a href="{{ url_for('admin_bookings') }}" class="btn-outline">Clear</a>
+        </div>
+      {% endif %}
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Bookings ({{ bookings|length }})</h2>
+
+    {% for booking in bookings %}
+      <div class="booking-row">
+        <div class="booking-top">
+          <div>
+            <div class="booking-name">{{ booking.package_name }}</div>
+            <div class="booking-meta">
+              Booked by {{ booking.traveller_name }} (@{{ booking.traveller_username }})
+              &middot; {{ booking.travel_date.strftime('%d %b %Y') }}
+              &middot; {{ booking.travellers }} traveller{{ '' if booking.travellers==1 else 's' }}
+              &middot; {{ booking.phone }}
+            </div>
+          </div>
+          <div class="booking-right">
+            <div class="booking-price">{{ booking.price|npr }}</div>
+            <span class="badge {{ booking.status|lower }}">{{ booking.status }}</span>
+          </div>
+        </div>
+
+        <details class="edit-panel">
+          <summary>Update status</summary>
+          <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}" class="edit-form">
+            <input type="hidden" name="search" value="{{ search }}">
+            <input type="hidden" name="status_filter" value="{{ selected_status }}">
+            <div class="field">
+              <label>Booking status</label>
+              <select name="status">
+                {% for item in ['Confirmed', 'Completed', 'Cancelled'] %}
+                  <option value="{{ item }}" {% if booking.status==item %}selected{% endif %}>{{ item }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field" style="flex: 0;">
+              <button type="submit" class="btn-outline">Save</button>
+            </div>
+          </form>
+        </details>
+      </div>
+    {% else %}
+      <div class="empty">No bookings match your search.</div>
+    {% endfor %}
+  </section>
+
+</main>
+
+</body>
+</html>

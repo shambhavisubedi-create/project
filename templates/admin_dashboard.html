@@ -134,19 +134,19 @@
   <section class="stats">
     <div class="stat-card">
       <h3>Total Travellers</h3>
-      <div class="stat-number">120</div>
+      <div class="stat-number">{{ total_travellers }}</div>
     </div>
     <div class="stat-card">
       <h3>Total Packages</h3>
-      <div class="stat-number">{{ featured_packages|length }}</div>
+      <div class="stat-number">{{ total_packages }}</div>
     </div>
     <div class="stat-card">
       <h3>Total Bookings</h3>
-      <div class="stat-number">85</div>
+      <div class="stat-number">{{ total_bookings }}</div>
     </div>
     <div class="stat-card">
       <h3>Travel Groups</h3>
-      <div class="stat-number">24</div>
+      <div class="stat-number">{{ total_groups }}</div>
     </div>
   </section>
 
@@ -159,7 +159,7 @@
       <h3>Manage Travellers</h3>
       <p>View and manage registered travellers
         using the GoGather system.</p>
-      <a href="#" class="btn">View Travellers</a>
+      <a href="/admin/travellers" class="btn">View Travellers</a>
     </div>
 
     <div class="admin-card">
@@ -183,7 +183,7 @@
       <h3>Manage Bookings</h3>
       <p>View traveller bookings and manage
         booking information.</p>
-      <a href="#" class="btn">View Bookings</a>
+      <a href="/admin/bookings" class="btn">View Bookings</a>
     </div>
 
     <div class="admin-card">

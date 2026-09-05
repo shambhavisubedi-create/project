@@ -15,7 +15,6 @@ app.teardown_appcontext(close_db)
 
           
 # MYSQL DATABASE CONNECTION
-
 # DEMO USERS
 # user = 0 → Traveller
 # user = 1 → Admin
@@ -333,12 +332,41 @@ def admin_dashboard():
             url_for("dashboard")
         )
 
+    # These stat cards used to show made-up numbers. Now they're a live
+    # count straight from the tables they claim to describe.
+
+    total_travellers = query(
+        "SELECT COUNT(*) AS total FROM users WHERE role = 0", fetch="one"
+    )["total"]
+
+    packages = query(
+        "SELECT id, name, duration_days, hotel_type, transport_mode, price FROM packages ORDER BY price"
+    )
+
+    total_packages = len(packages)
+
+    total_bookings = query(
+        "SELECT COUNT(*) AS total FROM bookings", fetch="one"
+    )["total"]
+
+    total_groups = query(
+        "SELECT COUNT(*) AS total FROM travel_groups", fetch="one"
+    )["total"]
+
     return render_template(
         "admin_dashboard.html",
 
         username=session["username"],
 
-        featured_packages=FEATURED_PACKAGES
+        featured_packages=packages,
+
+        total_travellers=total_travellers,
+
+        total_packages=total_packages,
+
+        total_bookings=total_bookings,
+
+        total_groups=total_groups
     )
 
 
@@ -741,9 +769,140 @@ def profile():
     return render_template("profile.html", user=user)
 
 
+# MANAGE TRAVELLERS - ADMIN
+
+@app.route("/admin/travellers", methods=["GET", "POST"])
+def manage_travellers():
+
+    # User must be logged in
+    if "username" not in session:
+
+        return redirect(url_for("login"))
+
+    # Only Admin can access this page
+    if session.get("user") != 1:
+
+        return redirect(url_for("dashboard"))
+
+    if request.method == "POST":
+
+        full_name = request.form.get("full_name", "").strip()
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip()
+        phone = request.form.get("phone", "").strip()
+        password = request.form.get("password", "")
+
+        # REQUIRED FIELDS
+
+        if not (full_name and username and email and password):
+
+            flash("Please fill in every required field.", "error")
+
+        # PHONE FORMAT
+
+        elif phone and not (phone.isdigit() and len(phone) == 10):
+
+            flash("Phone number must be a 10 digit number.", "error")
+
+        else:
+
+            try:
+
+                # Admin-added travellers are still travellers (role = 0).
+
+                execute(
+                    """
+                    INSERT INTO users
+                        (full_name, username, email, phone, password_hash, role)
+                    VALUES (%s, %s, %s, %s, %s, 0)
+                    """,
+                    (
+                        full_name,
+                        username,
+                        email,
+                        phone or None,
+                        generate_password_hash(password),
+                    ),
+                )
+
+            except IntegrityError:
+
+                flash("That username, email or phone number is already registered.", "error")
+
+            else:
+
+                flash("Traveller added.", "success")
+
+        return redirect(url_for("manage_travellers"))
+
+    travellers = query(
+        """
+        SELECT id, full_name, username, email, phone, created_at
+        FROM users
+        WHERE role = 0
+        ORDER BY created_at DESC
+        """
+    )
+
+    return render_template("manage_travellers.html", travellers=travellers)
+
+
+@app.route("/admin/travellers/<int:user_id>/update", methods=["POST"])
+def update_traveller(user_id):
+
+    if "username" not in session or session.get("user") != 1:
+        return redirect(url_for("login"))
+
+    full_name = request.form.get("full_name", "").strip()
+    email = request.form.get("email", "").strip()
+    phone = request.form.get("phone", "").strip()
+
+    if not full_name or not email:
+
+        flash("Full name and email are required.", "error")
+
+    elif phone and not (phone.isdigit() and len(phone) == 10):
+
+        flash("Phone number must be a 10 digit number.", "error")
+
+    else:
+
+        try:
+            execute(
+                "UPDATE users SET full_name = %s, email = %s, phone = %s WHERE id = %s AND role = 0",
+                (full_name, email, phone or None, user_id),
+            )
+
+        except IntegrityError:
+
+            flash("That email or phone number is already in use.", "error")
+
+        else:
+
+            flash("Traveller updated.", "success")
+
+    return redirect(url_for("manage_travellers"))
+
+
+@app.route("/admin/travellers/<int:user_id>/delete", methods=["POST"])
+def delete_traveller(user_id):
+
+    if "username" not in session or session.get("user") != 1:
+        return redirect(url_for("login"))
+
+    # Bookings, group memberships and groups they created are all set to
+    # cascade in the database, so removing the traveller cleans those up too.
+
+    execute("DELETE FROM users WHERE id = %s AND role = 0", (user_id,))
+
+    flash("Traveller removed.", "success")
+
+    return redirect(url_for("manage_travellers"))
+
+
 # MANAGE PACKAGES - ADMIN
 
-@app.route("/admin/packages")
+@app.route("/admin/packages", methods=["GET", "POST"])
 def admin_packages():
 
     # User must be logged in
@@ -760,11 +919,184 @@ def admin_packages():
             url_for("dashboard")
         )
 
-    return render_template(
-        "admin_packages.html",
+    if request.method == "POST":
 
-        packages=FEATURED_PACKAGES
+        name = request.form.get("name", "").strip()
+        hotel_type = request.form.get("hotel_type", "")
+        transport_mode = request.form.get("transport_mode", "")
+
+        try:
+            duration_days = int(request.form.get("duration_days", "0"))
+        except ValueError:
+            duration_days = 0
+
+        try:
+            price = float(request.form.get("price", "0"))
+        except ValueError:
+            price = 0
+
+        if not (name and hotel_type and transport_mode) or duration_days < 1 or price <= 0:
+
+            flash("Please fill in every field with a valid duration and price.", "error")
+
+        else:
+
+            execute(
+                """
+                INSERT INTO packages
+                    (name, duration_days, hotel_type, transport_mode, price)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (name, duration_days, hotel_type, transport_mode, price),
+            )
+
+            flash("Package added.", "success")
+
+        return redirect(url_for("admin_packages"))
+
+    packages = query(
+        "SELECT id, name, duration_days, hotel_type, transport_mode, price FROM packages ORDER BY price"
     )
+
+    return render_template("admin_packages.html", packages=packages)
+
+
+@app.route("/admin/packages/<int:package_id>/update", methods=["POST"])
+def update_package(package_id):
+
+    if "username" not in session or session.get("user") != 1:
+        return redirect(url_for("login"))
+
+    name = request.form.get("name", "").strip()
+    hotel_type = request.form.get("hotel_type", "")
+    transport_mode = request.form.get("transport_mode", "")
+
+    try:
+        duration_days = int(request.form.get("duration_days", "0"))
+    except ValueError:
+        duration_days = 0
+
+    try:
+        price = float(request.form.get("price", "0"))
+    except ValueError:
+        price = 0
+
+    if not (name and hotel_type and transport_mode) or duration_days < 1 or price <= 0:
+
+        flash("Please fill in every field with a valid duration and price.", "error")
+
+    else:
+
+        execute(
+            """
+            UPDATE packages
+            SET name = %s, duration_days = %s, hotel_type = %s, transport_mode = %s, price = %s
+            WHERE id = %s
+            """,
+            (name, duration_days, hotel_type, transport_mode, price, package_id),
+        )
+
+        flash("Package updated.", "success")
+
+    return redirect(url_for("admin_packages"))
+
+
+@app.route("/admin/packages/<int:package_id>/delete", methods=["POST"])
+def delete_package(package_id):
+
+    if "username" not in session or session.get("user") != 1:
+        return redirect(url_for("login"))
+
+    # Bookings that referenced this package keep their own copy of the
+    # package name and price, so they're unaffected (packages.id is set
+    # to NULL on the booking rather than the booking being removed).
+
+    execute("DELETE FROM packages WHERE id = %s", (package_id,))
+
+    flash("Package removed.", "success")
+
+    return redirect(url_for("admin_packages"))
+
+
+# MANAGE BOOKINGS - ADMIN
+
+@app.route("/admin/bookings")
+def admin_bookings():
+
+    # User must be logged in
+    if "username" not in session:
+
+        return redirect(url_for("login"))
+
+    # Only Admin can access this page
+    if session.get("user") != 1:
+
+        return redirect(url_for("dashboard"))
+
+    search = request.args.get("search", "").strip()
+    status_filter = request.args.get("status", "")
+
+    sql = """
+        SELECT b.id, b.package_name, b.travel_date, b.travellers, b.phone,
+               b.price, b.status, b.created_at,
+               u.full_name AS traveller_name, u.username AS traveller_username
+        FROM bookings b
+        JOIN users u ON u.id = b.user_id
+        WHERE 1=1
+    """
+    params = []
+
+    if search:
+        sql += " AND (u.full_name LIKE %s OR u.username LIKE %s OR b.package_name LIKE %s)"
+        like = f"%{search}%"
+        params.extend([like, like, like])
+
+    if status_filter:
+        sql += " AND b.status = %s"
+        params.append(status_filter)
+
+    sql += " ORDER BY b.created_at DESC"
+
+    bookings = query(sql, tuple(params))
+
+    # Status counts are pulled independently of the filters above so the
+    # summary cards always reflect every booking, not just the filtered view.
+
+    status_rows = query("SELECT status, COUNT(*) AS total FROM bookings GROUP BY status")
+    status_counts = {row["status"]: row["total"] for row in status_rows}
+
+    return render_template(
+        "admin_bookings.html",
+        bookings=bookings,
+        search=search,
+        selected_status=status_filter,
+        confirmed_count=status_counts.get("Confirmed", 0),
+        completed_count=status_counts.get("Completed", 0),
+        cancelled_count=status_counts.get("Cancelled", 0),
+    )
+
+
+@app.route("/admin/bookings/<int:booking_id>/update-status", methods=["POST"])
+def update_booking_status(booking_id):
+
+    if "username" not in session or session.get("user") != 1:
+        return redirect(url_for("login"))
+
+    status = request.form.get("status", "")
+    search = request.form.get("search", "")
+    status_filter = request.form.get("status_filter", "")
+
+    if status not in ("Confirmed", "Completed", "Cancelled"):
+
+        flash("Please choose a valid booking status.", "error")
+
+    else:
+
+        execute("UPDATE bookings SET status = %s WHERE id = %s", (status, booking_id))
+
+        flash("Booking status updated.", "success")
+
+    return redirect(url_for("admin_bookings", search=search, status=status_filter))
 
 
 # LOGOUT

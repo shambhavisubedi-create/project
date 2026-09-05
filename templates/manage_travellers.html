@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoGather - Manage Travellers</title>
+<style>
+  :root {
+    --primary: #a9455c;
+    --primary-dark: #8a3549;
+    --primary-light: #fbe4e6;
+    --charcoal: #2c2420;
+    --text: #4a3d38;
+    --text-muted: #8a7b73;
+    --border: #f0e3d5;
+    --bg: #fdf3ea;
+    --white: #ffffff;
+    --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .navbar { background: var(--bg); border-bottom: 1px solid var(--border); }
+  .navbar-inner { max-width: 1200px; margin: 0 auto; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; color: var(--charcoal); text-decoration: none; }
+  .nav-links a { color: var(--text); font-weight: 600; font-size: 0.92rem; padding: 8px 16px; border-radius: 999px; text-decoration: none; }
+  .nav-links a:hover { background: var(--primary-light); }
+  .logout-btn { background: var(--primary); color: white !important; padding: 9px 22px !important; border-radius: 999px; }
+
+  .container { max-width: 1000px; margin: 0 auto; padding: 45px 28px; }
+
+  h1 { font-family: var(--font-display); color: var(--charcoal); font-size: 2rem; margin: 0 0 8px; }
+  .subtitle { color: var(--text-muted); margin: 0 0 30px; }
+
+  .flash { padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; font-size: 0.9rem; }
+  .flash.success { background: #e5f3ec; color: #286650; }
+  .flash.error { background: #f9e6e8; color: #9b3544; }
+
+  .card { background: var(--white); border: 1px solid var(--border); border-radius: 16px; padding: 26px; box-shadow: 0 5px 18px rgba(80, 50, 40, 0.05); margin-bottom: 28px; }
+  .card h2 { font-family: var(--font-display); color: var(--charcoal); font-size: 1.3rem; margin: 0 0 18px; }
+
+  .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px; }
+  input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 0.9rem; }
+
+  .btn { display: inline-block; background: var(--primary); color: white; border: none; text-decoration: none; padding: 9px 18px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  .btn:hover { background: var(--primary-dark); }
+  .btn-outline { background: none; color: var(--primary-dark); border: 1px solid var(--primary-light); }
+  .btn-outline:hover { background: var(--primary-light); }
+  .btn-danger { background: none; color: #9b3544; border: 1px solid #e6b6ab; }
+  .btn-danger:hover { background: #f9e6e8; }
+
+  .traveller-row { border-bottom: 1px solid var(--border); padding: 16px 0; }
+  .traveller-row:last-child { border-bottom: none; }
+  .traveller-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .traveller-name { font-weight: 700; color: var(--charcoal); }
+  .traveller-meta { color: var(--text-muted); font-size: 0.85rem; margin-top: 2px; }
+  .traveller-actions { display: flex; gap: 8px; }
+  .traveller-actions form { display: inline; }
+
+  details.edit-panel { margin-top: 14px; }
+  details.edit-panel summary { cursor: pointer; color: var(--primary-dark); font-weight: 600; font-size: 0.85rem; }
+  .edit-form { margin-top: 12px; padding: 14px; background: var(--bg); border-radius: 10px; }
+
+  .empty { text-align: center; color: var(--text-muted); padding: 30px; }
+</style>
+</head>
+<body>
+
+<header class="navbar">
+  <div class="navbar-inner">
+    <a href="/admin-dashboard" class="brand">GoGather</a>
+    <nav class="nav-links">
+      <a href="/admin-dashboard">Dashboard</a>
+      <a href="/admin/packages">Packages</a>
+      <a href="/admin/bookings">Bookings</a>
+      <a href="/logout" class="logout-btn">Logout</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+  <h1>Manage Travellers</h1>
+  <p class="subtitle">Add, update or remove traveller accounts registered on GoGather.</p>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <section class="card">
+    <h2>Add a traveller</h2>
+    <form method="POST" action="{{ url_for('manage_travellers') }}">
+      <div class="form-grid">
+        <div>
+          <label for="full_name">Full name</label>
+          <input type="text" id="full_name" name="full_name" required>
+        </div>
+        <div>
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" required>
+        </div>
+        <div>
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required>
+        </div>
+        <div>
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" name="phone" pattern="[0-9]{10}" maxlength="10" title="Phone number must be a 10 digit number.">
+        </div>
+        <div class="full">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required minlength="8">
+        </div>
+        <div class="full">
+          <button type="submit" class="btn">Add traveller</button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Registered travellers ({{ travellers|length }})</h2>
+
+    {% for traveller in travellers %}
+      <div class="traveller-row">
+        <div class="traveller-top">
+          <div>
+            <div class="traveller-name">{{ traveller.full_name }} &middot; @{{ traveller.username }}</div>
+            <div class="traveller-meta">{{ traveller.email }}{% if traveller.phone %} &middot; {{ traveller.phone }}{% endif %}</div>
+          </div>
+          <div class="traveller-actions">
+            <form method="post" action="{{ url_for('delete_traveller', user_id=traveller.id) }}" onsubmit="return confirm('Remove this traveller? This also deletes their bookings and group memberships.')">
+              <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+          </div>
+        </div>
+
+        <details class="edit-panel">
+          <summary>Edit details</summary>
+          <form method="post" action="{{ url_for('update_traveller', user_id=traveller.id) }}" class="edit-form">
+            <div class="form-grid">
+              <div>
+                <label>Full name</label>
+                <input type="text" name="full_name" value="{{ traveller.full_name }}" required>
+              </div>
+              <div>
+                <label>Email</label>
+                <input type="email" name="email" value="{{ traveller.email }}" required>
+              </div>
+              <div>
+                <label>Phone</label>
+                <input type="tel" name="phone" value="{{ traveller.phone or '' }}" pattern="[0-9]{10}" maxlength="10" title="Phone number must be a 10 digit number.">
+              </div>
+              <div class="full">
+                <button type="submit" class="btn btn-outline">Save changes</button>
+              </div>
+            </div>
+          </form>
+        </details>
+      </div>
+    {% else %}
+      <div class="empty">No travellers have registered yet.</div>
+    {% endfor %}
+  </section>
+
+</main>
+
+</body>
+</html>
