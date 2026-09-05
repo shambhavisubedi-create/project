@@ -1,6 +1,6 @@
 from flask import Flask, flash, render_template, request, redirect, url_for, session
 from dotenv import load_dotenv
-from datetime import date
+from datetime import date, timedelta
 from mysql.connector import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -70,6 +70,12 @@ PACKAGE_DETAILS = {
     1: {"tag": "Culture & lakes", "summary": "A balanced city and lakeside escape combining Kathmandu's heritage with Pokhara's mountain views.", "places": ["Kathmandu", "Patan", "Pokhara", "Phewa Lake"], "activities": ["Heritage walk", "Lakeside boating", "Sunrise viewpoint"], "includes": ["Hotel stay", "Private transfers", "Daily breakfast", "Local guide"]},
     2: {"tag": "Wildlife escape", "summary": "A relaxed jungle break with guided wildlife experiences and a warm introduction to Tharu culture.", "places": ["Sauraha", "Chitwan National Park", "Rapti River"], "activities": ["Jeep safari", "Canoe ride", "Tharu cultural evening"], "includes": ["Hotel stay", "Safari permits", "Breakfast and dinner", "Naturalist guide"]},
     3: {"tag": "High Himalayan trek", "summary": "A carefully paced Everest journey through Sherpa villages, dramatic valleys and iconic mountain viewpoints.", "places": ["Lukla", "Namche Bazaar", "Tengboche", "Everest Base Camp"], "activities": ["Guided trek", "Acclimatisation hikes", "Mountain photography"], "includes": ["Domestic flights", "Teahouse stays", "Trekking guide", "Required permits"]},
+    5: {"tag": "Pilgrimage", "summary": "A short, peaceful visit to the birthplace of Lord Buddha and its surrounding monastic zone.", "places": ["Maya Devi Temple", "Sacred Garden", "Monastic Zone"], "activities": ["Pilgrimage walk", "Meditation session", "Cycling tour"], "includes": ["Hotel stay", "Private transfers", "Daily breakfast", "Local guide"]},
+    6: {"tag": "Hilltop retreat", "summary": "A quick weekend escape near Kathmandu built around Himalayan sunrise views.", "places": ["Nagarkot viewpoint", "Panoramic trails"], "activities": ["Sunrise viewing", "Short hikes", "Photography"], "includes": ["Hotel stay", "Jeep transfers", "Daily breakfast"]},
+    7: {"tag": "Heritage town", "summary": "A relaxed walk through a beautifully preserved Newari hill town with sweeping Himalayan views.", "places": ["Bandipur Bazaar", "Tundikhel", "Siddha Cave"], "activities": ["Village walks", "Cave visit", "Local cuisine tasting"], "includes": ["Hotel stay", "Private transfers", "Daily breakfast", "Local guide"]},
+    8: {"tag": "Remote alpine lake", "summary": "A trek into Nepal's far west to reach one of the country's most untouched alpine lakes.", "places": ["Rara National Park", "Lakeside trail", "Talcha"], "activities": ["Guided trekking", "Camping", "Nature photography"], "includes": ["Domestic flights", "Camping/lodge stays", "Trekking guide", "Required permits"]},
+    9: {"tag": "Trans-Himalayan jeep tour", "summary": "A dramatic jeep expedition into the walled villages and ochre cliffs of Upper Mustang.", "places": ["Lo Manthang", "Muktinath", "Kali Gandaki Valley"], "activities": ["Jeep touring", "Monastery visits", "Cultural walks"], "includes": ["4WD jeep transport", "Lodge stays", "Local guide", "Required permits"]},
+    10: {"tag": "Cultural city break", "summary": "A colourful introduction to Mithila art and tradition centred on the Janaki Mandir.", "places": ["Janaki Mandir", "Ganga Sagar"], "activities": ["Temple visit", "Mithila art workshop", "Food exploration"], "includes": ["Hotel stay", "Private transfers", "Daily breakfast"]},
 }
 
 
@@ -495,6 +501,11 @@ def place_detail(slug):
 # BOOK PACKAGE
 
 
+# Trips can be planned ahead, but not decades ahead -- two years covers any
+# realistic advance booking.
+MAX_BOOKING_DAYS_AHEAD = 180
+
+
 @app.route("/book_package", methods=["GET", "POST"])
 def book_package():
 
@@ -511,27 +522,42 @@ def book_package():
         (package_id,), fetch="one",
     ) if package_id else None
 
+    max_travel_date = (date.today() + timedelta(days=MAX_BOOKING_DAYS_AHEAD)).isoformat()
+
+    # The contact number always comes from the traveller's own account, never
+    # from the submitted form -- otherwise anyone could book a trip under
+    # someone else's phone number just by typing it into the field.
+    traveller_phone = query(
+        "SELECT phone FROM users WHERE id = %s", (session["user_id"],), fetch="one"
+    )["phone"]
+
+    if not traveller_phone:
+        flash("Please add a phone number to your profile before booking a package.", "error")
+        return redirect(url_for("profile"))
+
     if request.method == "POST":
 
         travel_date = request.form.get("travel_date", "")
-        phone = request.form.get("phone", "").strip()
+        phone=request.form.get("phone","").strip()
+        phone = traveller_phone
 
         try:
             travellers = int(request.form.get("travellers", "0"))
         except ValueError:
             travellers = 0
 
-        # A booking needs a real package, a future date, a phone number,
-        # and a sensible traveller count.
+        # A booking needs a real package, a date that's neither already
+        # passed nor unrealistically far out, and a sensible traveller count.
 
         if (
             package is None
             or travel_date < date.today().isoformat()
+            or travel_date > max_travel_date
             or not phone
             or not 1 <= travellers <= 20
         ):
 
-            flash("Please complete all booking details with a valid future travel date.", "error")
+            flash("Please complete all booking details with a valid travel date within the next 6 month years.", "error")
 
         else:
 
@@ -561,6 +587,8 @@ def book_package():
         package=package,
         packages=query("SELECT id, name, duration_days, price FROM packages ORDER BY price"),
         today=date.today().isoformat(),
+        max_travel_date=max_travel_date,
+        traveller_phone=traveller_phone,
     )
 
 
@@ -902,6 +930,29 @@ def delete_traveller(user_id):
 
 # MANAGE PACKAGES - ADMIN
 
+# A real Nepal package is never a one-rupee line item and never a multi-decade
+# "trip" -- these bounds keep the data admins enter believable.
+MIN_PACKAGE_PRICE = 2000
+MAX_PACKAGE_PRICE = 500000
+MIN_PACKAGE_DAYS = 1
+MAX_PACKAGE_DAYS = 60
+
+
+def validate_package_fields(name, hotel_type, transport_mode, duration_days, price):
+    """Returns an error message if the package fields aren't sane, else None."""
+
+    if not (name and hotel_type and transport_mode):
+        return "Please fill in every field."
+
+    if not (MIN_PACKAGE_DAYS <= duration_days <= MAX_PACKAGE_DAYS):
+        return f"Duration must be between {MIN_PACKAGE_DAYS} and {MAX_PACKAGE_DAYS} days."
+
+    if not (MIN_PACKAGE_PRICE <= price <= MAX_PACKAGE_PRICE):
+        return f"Price must be between {format_npr(MIN_PACKAGE_PRICE)} and {format_npr(MAX_PACKAGE_PRICE)}."
+
+    return None
+
+
 @app.route("/admin/packages", methods=["GET", "POST"])
 def admin_packages():
 
@@ -935,9 +986,11 @@ def admin_packages():
         except ValueError:
             price = 0
 
-        if not (name and hotel_type and transport_mode) or duration_days < 1 or price <= 0:
+        error = validate_package_fields(name, hotel_type, transport_mode, duration_days, price)
 
-            flash("Please fill in every field with a valid duration and price.", "error")
+        if error:
+
+            flash(error, "error")
 
         else:
 
@@ -981,9 +1034,11 @@ def update_package(package_id):
     except ValueError:
         price = 0
 
-    if not (name and hotel_type and transport_mode) or duration_days < 1 or price <= 0:
+    error = validate_package_fields(name, hotel_type, transport_mode, duration_days, price)
 
-        flash("Please fill in every field with a valid duration and price.", "error")
+    if error:
+
+        flash(error, "error")
 
     else:
 

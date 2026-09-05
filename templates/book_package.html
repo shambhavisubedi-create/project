@@ -102,6 +102,20 @@
       border: 1px solid #dfcec2;
       background: #fff
     }
+    input[readonly] {
+      background: #f3ebe4;
+      color: var(--t)
+    }
+    small {
+      display: block;
+      margin-top: 6px;
+      color: var(--m);
+      font-size: 12px
+    }
+    small a {
+      color: var(--w);
+      font-weight: bold
+    }
     button {
       border: 0;
       background: var(--w);
@@ -170,7 +184,7 @@
           {% endif %}
           <div>
             <label>Travel date</label>
-            <input type="date" name="travel_date" min="{{ today }}" required>
+            <input type="date" name="travel_date" min="{{ today }}" max="{{ max_travel_date }}" required>
           </div>
           <div>
             <label>Number of travellers</label>
@@ -178,7 +192,8 @@
           </div>
           <div class="full">
             <label>Contact phone number</label>
-            <input name="phone" required placeholder="98XXXXXXXX">
+            <input value="{{ traveller_phone }}" readonly>
+            <small>This is the number on your <a href="{{ url_for('profile') }}">profile</a>. Update it there if it's changed.</small>
           </div>
           <div class="full">
             <button type="submit">Confirm booking</button>

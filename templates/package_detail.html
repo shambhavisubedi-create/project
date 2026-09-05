@@ -206,7 +206,7 @@
           <h3>Starting price</h3>
           <div class="price">{{ package.price|npr }} <small>per traveller</small></div>
         </div>
-        <a class="book" href="{{ url_for('book_package') }}">Book this package</a>
+        <a class="book" href="{{ url_for('book_package', package_id=package.id) }}">Book this package</a>
         <p class="note">Booking confirmation and payment will be added in the next step.</p>
       </aside>
     </div>
