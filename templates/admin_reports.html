@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoGather - Reports</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin_reports.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+</head>
+<body>
+<div class="app-shell">
+  {% include "_sidebar_admin.html" %}
+  <div class="main">
+  {% set role_label = 'Admin' %}
+  {% include "_topbar.html" %}
+<main>
+  <header class="page-heading">
+    <div><p class="eyebrow">THE BIG PICTURE</p><h1>Reports</h1><p>A closer look at the journeys taking shape on GoGather.</p></div>
+    <div class="date-note">AS OF <strong>{{ today.strftime('%d %B %Y') }}</strong></div>
+  </header>
+  <form class="filters" method="get" action="{{ url_for('admin_reports') }}">
+    <label for="period">Booking period</label>
+    <select id="period" name="period">{% for value, label in periods.items() %}<option value="{{ value }}" {% if period == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    <button type="submit" class="btn">Update report</button>
+    <span>Based on when bookings were created.</span>
+  </form>
+  <section class="stats" aria-label="Booking summary">
+    <article class="stat"><p>Total bookings</p><strong>{{ total }}</strong><small>{{ periods[period] }}</small></article>
+    <article class="stat accent"><p>Confirmed &amp; completed value</p><strong>{{ accepted_value|npr }}</strong><small>Booking value, not payments collected</small></article>
+    <article class="stat"><p>Travellers booked</p><strong>{{ accepted_travellers }}</strong><small>Traveller spots on confirmed &amp; completed bookings</small></article>
+    <article class="stat"><p>Awaiting a decision</p><strong>{{ needs_attention }}</strong><small>Pending bookings &amp; cancellation requests</small></article>
+  </section>
+  {% if not total %}<div class="empty"><h2>No bookings in this period yet.</h2><p>Try a wider period, or check back when travellers start planning their trips.</p></div>{% endif %}
+  <div class="report-grid">
+    <section class="panel"><p class="eyebrow">THE JOURNEY OVER TIME</p><h2>Booking activity</h2><p class="helper">Bookings created each month, across all statuses.</p>
+      <div id="activity-chart" class="chart"></div>
+    </section>
+    <section class="panel"><p class="eyebrow">FROM REQUEST TO DEPARTURE</p><h2>Booking status</h2><p class="helper">Where bookings stand in the selected period.</p>
+      <div id="status-chart" class="chart"></div>
+      <a class="text-link" href="{{ url_for('admin_bookings') }}">Manage bookings &rarr;</a>
+    </section>
+  </div>
+  <section class="panel packages"><div class="section-heading"><div><p class="eyebrow">WHERE INTEREST IS GROWING</p><h2>Most-booked packages</h2></div><span class="helper">Top five by booking count</span></div>
+    <div class="table-wrap"><table><caption class="sr-only">Package booking counts and confirmed and completed booking values for {{ periods[period] }}</caption><thead><tr><th scope="col">Package</th><th scope="col">Bookings</th><th scope="col">Confirmed &amp; completed value</th></tr></thead><tbody>
+    {% for package in top_packages %}<tr><th scope="row"><span class="rank">{{ '%02d'|format(loop.index) }}</span>{{ package.name }}</th><td>{{ package.bookings }}</td><td>{{ package.value|npr }}</td></tr>{% else %}<tr><td colspan="3">Your most-booked packages will appear here once bookings come in.</td></tr>{% endfor %}
+    </tbody></table></div><p class="helper">Counts include all statuses. Values exclude pending bookings, cancellation requests and cancelled bookings. Packages are grouped by their name at booking time.</p>
+  </section>
+  <section class="snapshot"><div><p class="eyebrow">YOUR COMMUNITY TODAY</p><h2>GoGather at a glance</h2><p>Current totals across the platform, independent of the booking period.</p></div><div class="snapshot-grid">
+    <a href="{{ url_for('manage_travellers') }}"><strong>{{ travellers }}</strong><span>Travellers &rarr;</span></a>
+    <a href="{{ url_for('manage_places') }}"><strong>{{ place_count }}</strong><span>Destinations &rarr;</span></a>
+    <a href="{{ url_for('admin_packages') }}"><strong>{{ package_count }}</strong><span>Packages &rarr;</span></a>
+    <a href="{{ url_for('admin_travel_groups') }}"><strong>{{ group_count }}</strong><span>Travel groups &rarr;</span></a>
+  </div></section>
+  <footer><span>GoGather &middot; Every journey tells a story.</span><a href="{{ url_for('admin_dashboard') }}">&larr; Back to dashboard</a></footer>
+</main>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script>
+  Highcharts.setOptions({
+    chart: { style: { fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif" } },
+    credits: { enabled: false },
+    title: { text: null }
+  });
+
+  Highcharts.chart('activity-chart', {
+    chart: { type: 'column', height: 320 },
+    xAxis: { categories: {{ timeline|map(attribute='label')|list|tojson }} },
+    yAxis: { title: { text: null }, allowDecimals: false },
+    legend: { enabled: false },
+    tooltip: { headerFormat: '<b>{point.key}</b><br>', pointFormat: '{point.y} booking{point.y === 1 ? "" : "s"}' },
+    plotOptions: { column: { color: '#a9455c', borderRadius: 4, pointPadding: 0.1, groupPadding: 0.08 } },
+    series: [{ name: 'Bookings', data: {{ timeline|map(attribute='count')|list|tojson }} }]
+  });
+
+  Highcharts.chart('status-chart', {
+    chart: { type: 'pie', height: 320 },
+    tooltip: { pointFormat: '{point.y} booking{point.y === 1 ? "" : "s"} ({point.percentage:.0f}%)' },
+    plotOptions: {
+      pie: {
+        colors: ['#a9455c', '#8a3549', '#d98a97', '#4a3d38', '#c9a691'],
+        dataLabels: { format: '{point.name}: {point.y}' }
+      }
+    },
+    series: [{
+      name: 'Bookings',
+      data: {{ statuses.items()|list|tojson }}.map(([name, y]) => ({ name, y }))
+    }]
+  });
+</script>
+</body>
+</html>

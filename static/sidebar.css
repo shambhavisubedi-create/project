@@ -1,0 +1,82 @@
+/* Shared app shell: left sidebar navigation + slim topbar.
+   Used by every logged-in page (traveller and admin). */
+
+.app-shell { display: flex; align-items: stretch; min-height: 100vh; }
+
+.sidebar {
+  width: 230px;
+  flex-shrink: 0;
+  background: #fffbf5;
+  border-right: 1px solid #f0e3d5;
+  display: flex;
+  flex-direction: column;
+  transition: width .18s ease;
+}
+.sidebar-brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 20px 18px; border-bottom: 1px solid #f0e3d5;
+  font-family: Georgia, "Iowan Old Style", serif; font-weight: 700; font-size: 1.15rem;
+  color: #2c2420; white-space: nowrap; text-decoration: none;
+}
+.sidebar-brand:hover { text-decoration: none; }
+.sidebar-brand .dot { width: 10px; height: 10px; border-radius: 999px; background: #a9455c; flex-shrink: 0; }
+.sidebar-nav { flex: 1; padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.sidebar-nav a, .sidebar-logout {
+  display: flex; align-items: center; gap: 13px;
+  padding: 11px 12px; border-radius: 10px;
+  color: #4a3d38; font-weight: 600; font-size: 0.92rem;
+  white-space: nowrap; text-decoration: none;
+}
+.sidebar-nav a svg, .sidebar-logout svg { width: 19px; height: 19px; flex-shrink: 0; }
+.sidebar-nav a:hover { background: #fbe7e3; text-decoration: none; }
+.sidebar-nav a.active { background: #fbe4e6; color: #8a3549; }
+.sidebar-foot { border-top: 1px solid #f0e3d5; padding: 10px; }
+.sidebar-logout { color: #c1613f; }
+.sidebar-logout:hover { background: #fbe4e6; }
+
+/* collapsed = icon-only rail (desktop) */
+body.sidebar-collapsed .sidebar { width: 68px; }
+body.sidebar-collapsed .sidebar .label { display: none; }
+
+.main { flex: 1; min-width: 0; }
+
+.topbar {
+  background: #fdf3ea; border-bottom: 1px solid #f0e3d5;
+  display: flex; align-items: center; gap: 14px; padding: 12px 22px;
+}
+.hamburger {
+  width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+  border: 1px solid #f0e3d5; background: #fffbf5; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; margin: 0; box-sizing: border-box;
+}
+.hamburger:hover { background: #fbe7e3; }
+.hamburger svg { width: 20px; height: 20px; color: #2c2420; }
+.topbar-spacer { flex: 1; }
+.topbar-user { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; color: #4a3d38; white-space: nowrap; }
+.topbar-user .role-badge {
+  padding: 3px 11px; border-radius: 999px; font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  background: #fbe4e6; color: #8a3549; font-weight: 700;
+}
+
+.sidebar-backdrop { display: none; }
+
+@media (max-width: 880px) {
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 60;
+    width: 230px;
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+  }
+  body.sidebar-mobile-open .sidebar { transform: translateX(0); box-shadow: 8px 0 24px rgba(44,36,32,0.18); }
+  body.sidebar-collapsed .sidebar { width: 230px; }
+  body.sidebar-collapsed .sidebar .label { display: inline; }
+  body.sidebar-mobile-open .sidebar-backdrop {
+    display: block; position: fixed; inset: 0; background: rgba(44,36,32,0.35); z-index: 55;
+  }
+  .topbar-user span:not(.role-badge) { display: none; }
+}
+@media (max-width: 480px) {
+  .topbar-user .role-badge { display: none; }
+}

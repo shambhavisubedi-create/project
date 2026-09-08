@@ -27,13 +27,6 @@
     color: var(--text);
   }
 
-  .navbar { background: var(--bg); border-bottom: 1px solid var(--border); }
-  .navbar-inner { max-width: 1200px; margin: 0 auto; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; }
-  .brand { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; color: var(--charcoal); text-decoration: none; }
-  .nav-links a { color: var(--text); font-weight: 600; font-size: 0.92rem; padding: 8px 16px; border-radius: 999px; text-decoration: none; }
-  .nav-links a:hover { background: var(--primary-light); }
-  .logout-btn { background: var(--primary); color: white !important; padding: 9px 22px !important; border-radius: 999px; }
-
   .container { max-width: 1000px; margin: 0 auto; padding: 45px 28px; }
 
   h1 { font-family: var(--font-display); color: var(--charcoal); font-size: 2rem; margin: 0 0 8px; }
@@ -73,20 +66,15 @@
 
   .empty { text-align: center; color: var(--text-muted); padding: 30px; }
 </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
 </head>
 <body>
-
-<header class="navbar">
-  <div class="navbar-inner">
-    <a href="/admin-dashboard" class="brand">GoGather</a>
-    <nav class="nav-links">
-      <a href="/admin-dashboard">Dashboard</a>
-      <a href="/admin/travellers">Travellers</a>
-      <a href="/admin/bookings">Bookings</a>
-      <a href="/logout" class="logout-btn">Logout</a>
-    </nav>
-  </div>
-</header>
+<div class="app-shell">
+  {% include "_sidebar_admin.html" %}
+  <div class="main">
+  {% set role_label = 'Admin' %}
+  {% include "_topbar.html" %}
 
 <main class="container">
 
@@ -204,5 +192,8 @@
 
 </main>
 
+  </div>
+</div>
+<script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
 </body>
 </html>

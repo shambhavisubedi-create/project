@@ -26,18 +26,6 @@
   a { color: var(--primary-dark); text-decoration: none; }
   a:hover { text-decoration: underline; }
 
-  /* topbar */
-  .topbar { background: var(--bg); border-bottom: 1px solid var(--border); }
-  .topbar-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; gap: 24px; padding: 12px 20px; flex-wrap: wrap; }
-  .brand { color: var(--charcoal); font-weight: 700; font-size: 1.2rem; font-family: var(--font-display); }
-  .topnav { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
-  .topnav a { color: var(--text-muted); font-size: 0.9rem; padding: 7px 14px; border-radius: 999px; font-weight: 600; }
-  .topnav a:hover { color: var(--charcoal); text-decoration: none; background: var(--cream-deep); }
-  .topnav a.active { background: var(--primary-light); color: var(--primary-dark); }
-  .topbar-user { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; }
-  .role-badge { padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; background: var(--primary-light); color: var(--primary-dark); font-weight: 700; }
-  .logout-link { color: #c1613f; font-weight: 600; }
-
   .page { max-width: 1100px; margin: 0 auto; padding: 30px 20px; }
 
   /* Welcome banner */
@@ -64,14 +52,19 @@
   .stat-tile .num { font-size: 1.8rem; font-weight:700; color: var(--primary-dark); }
   .stat-tile .label { color: var(--text-muted); font-size:0.85rem; }
 
-  /* Quicklinks grid */
-  .quicklinks { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 34px; }
-  .quicklink-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow); text-align: center; transition: transform 0.1s ease; }
-  .quicklink-card:hover { transform: translateY(-3px); text-decoration: none; border-color: var(--primary); }
-  .quicklink-icon { width: 52px; height: 52px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--primary-light); color: var(--primary-dark); }
-  .quicklink-icon svg { width: 24px; height: 24px; }
-  .quicklink-title { font-weight: 700; color: var(--charcoal); font-family: var(--font-display); }
-  .quicklink-desc { color: var(--text-muted); font-size: 0.85rem; margin-top: 4px; }
+  /* Popular destinations */
+  .destinations { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 34px; }
+  .destination-card { position: relative; display: block; height: 140px; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  .destination-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .destination-card::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(20,14,10,0.75), rgba(20,14,10,0) 65%); }
+  .destination-label { position: absolute; left: 14px; right: 14px; bottom: 12px; z-index: 1; color: #fff; }
+  .destination-label .name { font-family: var(--font-display); font-weight: 700; display: block; }
+  .destination-label .region { font-size: 0.78rem; opacity: 0.85; }
+
+  /* Footer */
+  .site-footer { margin-top: 40px; padding: 24px 4px; border-top: 1px solid var(--border); color: #000; font-size: 0.85rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .site-footer a { color: #000; }
+  .site-footer a:hover { color: var(--primary-dark); }
 
   /* Package cards */
   .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap:20px; }
@@ -85,27 +78,15 @@
   .btn-sm { display:inline-block; padding: 6px 16px; border-radius: 999px; background: var(--primary); color:#fff; font-size:0.8rem; font-weight:600; }
   .btn-sm:hover { background: var(--primary-dark); text-decoration:none; }
 </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
 </head>
 <body>
-
-  <header class="topbar">
-    <div class="topbar-inner">
-      <a class="brand" href="/dashboard">GoGather</a>
-      <nav class="topnav">
-        <a href="/explore_places">Explore Places</a>
-        <a href="/packages">Travel Packages</a>
-        <a href="/book_package">Book Package</a>
-        <a href="/my_bookings">My Bookings</a>
-        <a href="/travel_groups">Travel Groups</a>
-        <a href="/profile">Profile</a>
-      </nav>
-      <div class="topbar-user">
-        <span>Welcome, <strong>{{ session.username }}</strong>!</span>
-        <span class="role-badge">Traveller</span>
-        <a class="logout-link" href="/logout">Logout</a>
-      </div>
-    </div>
-  </header>
+<div class="app-shell">
+  {% include "_sidebar_traveller.html" %}
+  <div class="main">
+  {% set role_label = 'Traveller' %}
+  {% include "_topbar.html" %}
 
   <div class="page">
 
@@ -138,33 +119,20 @@
       </div>
     </div>
 
-    <!-- Quicklinks -->
-    <div class="quicklinks">
-      <a class="quicklink-card" href="/explore_places">
-        <div class="quicklink-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg></div>
-        <div class="quicklink-title">Explore Places</div>
-        <div class="quicklink-desc">Browse travel destinations</div>
+    <!-- Popular destinations, pulled from the same catalogue as Explore Places -->
+    <h2>Popular Destinations</h2>
+    <div class="destinations">
+      {% for place in popular_destinations %}
+      <a class="destination-card" href="{{ url_for('place_detail', slug=place.slug) }}">
+        <img src="{{ url_for('static', filename=place.image) }}" alt="{{ place.name }}">
+        <div class="destination-label">
+          <span class="name">{{ place.name }}</span>
+          <span class="region">{{ place.region }}</span>
+        </div>
       </a>
-      <a class="quicklink-card" href="/packages">
-        <div class="quicklink-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg></div>
-        <div class="quicklink-title">Travel Packages</div>
-        <div class="quicklink-desc">View and book packages</div>
-      </a>
-      <a class="quicklink-card" href="/travel_groups">
-        <div class="quicklink-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-6 7-6s7 2.7 7 6"/><circle cx="18" cy="9" r="2.4"/><path d="M16.2 14.2c2.6.3 4.8 2.3 4.8 5.3"/></svg></div>
-        <div class="quicklink-title">Travel Groups</div>
-        <div class="quicklink-desc">Create or join a group</div>
-      </a>
-      <a class="quicklink-card" href="/my_bookings">
-        <div class="quicklink-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.2c-1.6-1-4-1.4-6-1v13c2-.4 4.4 0 6 1 1.6-1 4-1.4 6-1v-13c-2-.4-4.4 0-6 1z"/><path d="M12 6.2v13"/></svg></div>
-        <div class="quicklink-title">My Bookings</div>
-        <div class="quicklink-desc">Track and manage bookings</div>
-      </a>
-      <a class="quicklink-card" href="/profile">
-        <div class="quicklink-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20c0-3.6 3.4-6.5 7.5-6.5s7.5 2.9 7.5 6.5"/></svg></div>
-        <div class="quicklink-title">Profile</div>
-        <div class="quicklink-desc">Your account details</div>
-      </a>
+      {% else %}
+      <p>No destinations available right now.</p>
+      {% endfor %}
     </div>
 
     <h2>Featured Packages</h2>
@@ -190,7 +158,15 @@
       {% endfor %}
     </div>
 
+    <footer class="site-footer">
+      <span>&copy; 2026 GoGather. All rights reserved.</span>
+      <span>Contact us: <a href="mailto:support@gogather.com">support@gogather.com</a> &middot; +977-9863646363</span>
+    </footer>
+
   </div>
 
+  </div>
+</div>
+<script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
 </body>
 </html>

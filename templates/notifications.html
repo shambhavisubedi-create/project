@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Notifications | GoGather</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+</head>
+<body class="notification-page">
+<div class="app-shell">
+  {% include "_sidebar_admin.html" if is_admin else "_sidebar_traveller.html" %}
+  <div class="main">
+  {% set role_label = 'Admin' if is_admin else 'Traveller' %}
+  {% include "_topbar.html" %}
+  <main class="inbox-wrap">
+    <section class="inbox-intro">
+      <p class="inbox-eyebrow">{{ 'ADMIN' if is_admin else 'TRAVELLER' }} INBOX</p>
+      <h1>A little update.<br>A step closer to your journey.</h1>
+      <p>Group requests, booking updates, and decisions &mdash; all in one place.</p>
+    </section>
+    <section class="inbox-panel" aria-labelledby="inbox-title">
+      <div class="inbox-toolbar">
+        <div><h2 id="inbox-title">Notifications</h2><p>{{ notifications|length }} total &middot; {{ unread_notification_count|default(0) }} unread</p></div>
+        {% if unread_notification_count|default(0) %}
+        <form action="{{ url_for('read_notifications') }}" method="post"><button type="submit">Mark all as read</button></form>
+        {% endif %}
+      </div>
+      {% if notifications %}
+      <ol class="inbox-list">
+        {% for n in notifications %}
+        <li class="inbox-item {{ 'is-unread' if not n.is_read else '' }}">
+          <span class="inbox-symbol" aria-hidden="true">{% if not n.is_read %}&#9679;{% else %}&#10003;{% endif %}</span>
+          <div class="inbox-content">
+            <span class="inbox-label">{{ 'NEW UPDATE' if not n.is_read else 'READ' }}</span>
+            <p>{{ n.message }}</p>
+            <time datetime="{{ n.created_at.isoformat() }}">{{ n.created_at.strftime('%d %b %Y - %I:%M %p') }}</time>
+          </div>
+          {% if n.link %}<a class="inbox-action" href="{{ n.link }}">View details <span aria-hidden="true">&rarr;</span></a>{% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <div class="inbox-empty"><span aria-hidden="true">&#9993;</span><h3>You're all caught up</h3><p>{{ 'New traveller requests will appear here.' if is_admin else 'Your group and booking updates will appear here.' }}</p><a href="{{ url_for('admin_travel_groups') if is_admin else url_for('travel_groups') }}">Explore travel groups &rarr;</a></div>
+      {% endif %}
+    </section>
+    <p class="inbox-footnote">Your updates stay here after you read them. Refresh the page to see new notifications.</p>
+  </main>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+</body>
+</html>

@@ -1,10 +1,15 @@
-from flask import Flask, flash, render_template, request, redirect, url_for, session
+from flask import Flask, abort, flash, render_template, request, redirect, url_for, session
+import re
+import secrets
+import sqlite3
+from pathlib import Path
 from dotenv import load_dotenv
 from datetime import date, timedelta
 from mysql.connector import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from db import close_db, execute, query
+from place_store import get_places, save_place, remove_place
 
 load_dotenv()
 
@@ -95,6 +100,58 @@ def ensure_group_columns():
         execute("ALTER TABLE travel_groups ADD COLUMN budget_range VARCHAR(50) NULL")
     if "description" not in columns:
         execute("ALTER TABLE travel_groups ADD COLUMN description TEXT NULL")
+    if "status" not in columns:
+        execute("ALTER TABLE travel_groups ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'Pending'")
+
+    member_columns = {row["Field"] for row in query("DESCRIBE group_members")}
+    if "status" not in member_columns:
+        # Existing memberships predate this feature, so grandfather them in as
+        # Confirmed rather than making everyone re-request to join.
+        execute("ALTER TABLE group_members ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'Confirmed'")
+
+
+def ensure_notifications_table():
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            message VARCHAR(255) NOT NULL,
+            link VARCHAR(255) NULL,
+            is_read TINYINT(1) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+
+def notify(user_id, message, link=None):
+    execute("INSERT INTO notifications (user_id, message, link) VALUES (%s, %s, %s)", (user_id, message[:255], link))
+
+
+@app.before_request
+def prepare_notifications():
+    # Also runs under `flask run`, where the __main__ startup block is skipped.
+    if "user_id" in session and not app.config.get("NOTIFICATIONS_READY"):
+        ensure_notifications_table()
+        app.config["NOTIFICATIONS_READY"] = True
+
+
+def notify_admins(message, link=None):
+    for admin in query("SELECT id FROM users WHERE role = 1"):
+        notify(admin["id"], message, link)
+
+
+@app.context_processor
+def inject_notifications():
+    if "user_id" not in session:
+        return {}
+    unread_notification_count = query(
+        "SELECT COUNT(*) AS total FROM notifications WHERE user_id = %s AND is_read = 0",
+        (session["user_id"],), fetch="one",
+    )["total"]
+    return {"unread_notification_count": unread_notification_count}
 
 
 # LANDING PAGE
@@ -315,6 +372,8 @@ def dashboard():
 
         featured_packages=FEATURED_PACKAGES,
 
+        popular_destinations=get_places(PLACES)[:4],
+
         username=session["username"]
     )
 
@@ -356,8 +415,64 @@ def admin_dashboard():
     )["total"]
 
     total_groups = query(
-        "SELECT COUNT(*) AS total FROM travel_groups", fetch="one"
+        "SELECT COUNT(*) AS total FROM travel_groups", 
+        fetch="one"
     )["total"]
+
+    # Items waiting on an admin decision, so the dashboard surfaces work to
+    # do instead of just repeating the sidebar's navigation links.
+
+    pending_bookings = query(
+        "SELECT COUNT(*) AS total FROM bookings WHERE status = 'Pending'", fetch="one"
+    )["total"]
+
+    cancel_requests = query(
+        "SELECT COUNT(*) AS total FROM bookings WHERE status = 'Cancel Requested'", fetch="one"
+    )["total"]
+
+    pending_groups = query(
+        "SELECT COUNT(*) AS total FROM travel_groups WHERE status = 'Pending'", fetch="one"
+    )["total"]
+
+    pending_group_members = query(
+        "SELECT COUNT(*) AS total FROM group_members WHERE status = 'Pending'", fetch="one"
+    )["total"]
+
+    recent_travellers = query(
+        """
+        SELECT full_name, username, email, created_at
+        FROM users
+        WHERE role = 0
+        ORDER BY created_at DESC
+        LIMIT 5
+        """
+    )
+
+    # Traveller performance is worked out from each traveller's own booking
+    # history (no separate rating step needed -- a booking's status already
+    # tells us whether the trip went ahead, so we can score off that alone).
+
+    traveller_performance = query(
+        """
+        SELECT u.full_name, u.username,
+               COUNT(b.id) AS total_bookings,
+               SUM(b.status = 'Completed') AS completed_bookings,
+               SUM(b.status IN ('Cancelled', 'Cancel Requested')) AS cancelled_bookings,
+               SUM(CASE WHEN b.status IN ('Confirmed', 'Completed') THEN b.price ELSE 0 END) AS total_spend,
+               MAX(b.created_at) AS last_booking
+        FROM users u
+        JOIN bookings b ON b.user_id = u.id
+        WHERE u.role = 0
+        GROUP BY u.id
+        ORDER BY total_spend DESC, total_bookings DESC
+        LIMIT 8
+        """
+    )
+
+    for row in traveller_performance:
+        row["completion_rate"] = round(
+            100 * row["completed_bookings"] / row["total_bookings"]
+        )
 
     return render_template(
         "admin_dashboard.html",
@@ -372,8 +487,93 @@ def admin_dashboard():
 
         total_bookings=total_bookings,
 
-        total_groups=total_groups
+        total_groups=total_groups,
+
+        pending_bookings=pending_bookings,
+
+        cancel_requests=cancel_requests,
+
+        pending_groups=pending_groups,
+
+        pending_group_members=pending_group_members,
+
+        recent_travellers=recent_travellers,
+
+        traveller_performance=traveller_performance
     )
+
+
+PLACE_CATEGORIES = ("Cultural", "Adventure", "Wildlife", "Trekking", "Nature")
+PLACE_BUDGETS = ("Budget", "Moderate", "Premium")
+
+
+@app.route("/admin/places", methods=["GET", "POST"])
+def manage_places():
+    if "username" not in session:
+        return redirect(url_for("login"))
+    if session.get("user") != 1:
+        return redirect(url_for("dashboard"))
+
+    session.setdefault("places_csrf", secrets.token_hex(32))
+    all_places = get_places(PLACES)
+    images = sorted(path.name for path in Path(app.static_folder).iterdir()
+                    if path.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"))
+    selected = request.args.get("edit")
+    editing = next((place for place in all_places if place["slug"] == selected), None)
+    if selected and editing is None:
+        abort(404)
+    form = dict(editing) if editing else {}
+    error = None
+    if request.method == "POST":
+        if not secrets.compare_digest(session["places_csrf"], request.form.get("csrf_token", "")):
+            abort(400)
+        action = request.form.get("action")
+        slug = request.form.get("slug", "")
+        existing = next((place for place in all_places if place["slug"] == slug), None)
+        if action not in ("add", "edit", "delete"):
+            abort(400)
+        if action in ("edit", "delete") and existing is None:
+            abort(404)
+        if action == "delete":
+            remove_place(PLACES, slug)
+            flash(f'{existing["name"]} has been removed.', "success")
+            return redirect(url_for("manage_places"))
+        editing = existing if action == "edit" else None
+        fields = ("name", "region", "category", "budget", "days", "weather",
+                  "best_time", "image", "description", "highlights", "activities")
+        form = {field: request.form.get(field, "").strip() for field in fields}
+        form["slug"] = slug if editing else re.sub(r"[^a-z0-9]+", "-", form["name"].lower()).strip("-")
+        if not all(form[field] for field in fields) or not form["slug"]:
+            error = "Please fill in every field so travellers have the details they need."
+        elif any(len(form[field]) > (2000 if field == "description" else 500) for field in fields):
+            error = "Please keep the description under 2,000 characters and other fields under 500."
+        elif form["category"] not in PLACE_CATEGORIES or form["budget"] not in PLACE_BUDGETS or form["image"] not in images:
+            error = "Please choose a category, budget and cover photo from the available options."
+        for field in ("highlights", "activities"):
+            form[field] = [value.strip() for value in form[field].split(",") if value.strip()]
+            if not form[field]:
+                error = "Add at least one highlight and one activity."
+        if error is None:
+            try:
+                save_place(PLACES, form, creating=action == "add")
+            except sqlite3.IntegrityError:
+                error = "A destination with this name already exists. Please choose another name."
+            else:
+                flash(f'{form["name"]} has been {"updated" if editing else "added"}.', "success")
+                return redirect(url_for("manage_places"))
+
+    search = request.args.get("search", "").strip()
+    places = [
+        place for place in all_places
+        if search.casefold() in " ".join(
+            (place["name"], place["region"], place["category"])
+        ).casefold()
+    ]
+    return render_template("manage_places.html", places=places, search=search,
+                           total=len(all_places), regions=len({p["region"] for p in all_places}),
+                           categories=PLACE_CATEGORIES, budgets=PLACE_BUDGETS, images=images,
+                           form=form, editing=editing, error=error,
+                           show_form=bool(error or editing or request.args.get("add"))), (400 if error else 200)
 
 
 # TRAVEL PACKAGES - TRAVELLER
@@ -461,7 +661,7 @@ def explore_places():
     budget = request.args.get("budget", "")
 
     places = [
-        place for place in PLACES
+        place for place in get_places(PLACES)
         if (not search or search in place["name"].lower()
             or search in place["region"].lower()
             or search in place["description"].lower())
@@ -485,12 +685,13 @@ def place_detail(slug):
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
-    place = next((item for item in PLACES if item["slug"] == slug), None)
+    all_places = get_places(PLACES)
+    place = next((item for item in all_places if item["slug"] == slug), None)
     if place is None:
         return redirect(url_for("explore_places"))
 
     similar_places = [
-        item for item in PLACES
+        item for item in all_places
         if item["category"] == place["category"] and item["slug"] != slug
     ][:3]
     return render_template(
@@ -504,6 +705,32 @@ def place_detail(slug):
 # Trips can be planned ahead, but not decades ahead -- two years covers any
 # realistic advance booking.
 MAX_BOOKING_DAYS_AHEAD = 180
+
+
+def has_overlapping_booking(user_id, travel_date, duration_days):
+    """A traveller can hold as many bookings as they like, just not two
+    that put them in two places on the same day."""
+
+    new_start = travel_date
+    new_end = travel_date + timedelta(days=duration_days - 1)
+
+    active_bookings = query(
+        """
+        SELECT b.travel_date, COALESCE(p.duration_days, 1) AS duration_days
+        FROM bookings b
+        LEFT JOIN packages p ON p.id = b.package_id
+        WHERE b.user_id = %s AND b.status != 'Cancelled'
+        """,
+        (user_id,),
+    )
+
+    for booking in active_bookings:
+        existing_start = booking["travel_date"]
+        existing_end = existing_start + timedelta(days=booking["duration_days"] - 1)
+        if new_start <= existing_end and existing_start <= new_end:
+            return True
+
+    return False
 
 
 @app.route("/book_package", methods=["GET", "POST"])
@@ -559,6 +786,13 @@ def book_package():
 
             flash("Please complete all booking details with a valid travel date within the next 6 month years.", "error")
 
+        elif has_overlapping_booking(session["user_id"], date.fromisoformat(travel_date), package["duration_days"]):
+
+            # You can't be in two places at once, so a traveller's active
+            # bookings (cancelled ones don't count) can't share any days.
+
+            flash("You already have a trip booked over these dates. You can only book one package at a time for a given period.", "error")
+
         else:
 
             execute(
@@ -578,6 +812,8 @@ def book_package():
                 ),
             )
 
+            notify_admins(f"{session['username']} requested a booking for '{package['name']}'.", url_for("admin_bookings"))
+            notify(session["user_id"], f"Your booking for '{package['name']}' is awaiting admin confirmation.", url_for("my_bookings"))
             flash("Your booking request has been submitted and is awaiting admin confirmation.", "success")
 
             return redirect(url_for("my_bookings"))
@@ -657,6 +893,8 @@ def cancel_booking(booking_id):
             "UPDATE bookings SET status = 'Cancelled' WHERE id = %s AND user_id = %s",
             (booking_id, session["user_id"]),
         )
+        notify_admins(f"{session['username']} cancelled pending booking #{booking_id}.", url_for("admin_bookings"))
+        notify(session["user_id"], f"Your booking #{booking_id} has been cancelled.", url_for("my_bookings"))
         flash("Your booking has been cancelled.", "success")
 
     else:
@@ -664,6 +902,8 @@ def cancel_booking(booking_id):
             "UPDATE bookings SET status = 'Cancel Requested' WHERE id = %s AND user_id = %s",
             (booking_id, session["user_id"]),
         )
+        notify_admins(f"{session['username']} requested cancellation of booking #{booking_id}.", url_for("admin_bookings"))
+        notify(session["user_id"], f"Cancellation of booking #{booking_id} is awaiting admin approval.", url_for("my_bookings"))
         flash("Your cancellation request has been submitted and is awaiting admin approval.", "success")
 
     return redirect(url_for("my_bookings"))
@@ -683,15 +923,18 @@ def travel_groups():
     destination = request.args.get("destination", "").strip()
     sql = """
         SELECT tg.id, tg.name, tg.destination, tg.travel_date, tg.max_members,
-               tg.budget_range, tg.description, u.username AS created_by,
-               COUNT(gm.id) AS member_count,
-               SUM(gm.user_id = %s) AS has_joined
+               tg.budget_range, tg.description, tg.status, u.username AS created_by,
+               SUM(gm.status = 'Confirmed') AS member_count,
+               SUM(gm.user_id = %s AND gm.status = 'Confirmed') AS has_joined,
+               SUM(gm.user_id = %s AND gm.status = 'Pending') AS has_requested
         FROM travel_groups tg
         JOIN users u ON u.id = tg.created_by
         LEFT JOIN group_members gm ON gm.group_id = tg.id
         WHERE tg.travel_date >= CURDATE()
+          AND (tg.status = 'Confirmed' OR tg.created_by = %s)
     """
-    params = [session["user_id"]]
+    # you can always see your own group, even before it's approved
+    params = [session["user_id"], session["user_id"], session["user_id"]]
     if destination:
         sql += " AND (tg.destination LIKE %s OR tg.name LIKE %s)"
         params.extend([f"%{destination}%", f"%{destination}%"])
@@ -731,16 +974,22 @@ def create_travel_group():
     group_id = execute(
         """
         INSERT INTO travel_groups
-            (name, destination, travel_date, max_members, created_by, budget_range, description)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+            (name, destination, travel_date, max_members, created_by, budget_range, description, status)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, 'Pending')
         """,
         (name, destination, travel_date, max_members, session["user_id"],
          budget_range or None, description or None),
     )
-    execute("INSERT INTO group_members (group_id, user_id) VALUES (%s, %s)",
+    execute("INSERT INTO group_members (group_id, user_id, status) VALUES (%s, %s, 'Confirmed')",
             (group_id, session["user_id"]))
-    flash("Your travel group has been created. You are its first member!", "success")
+    notify_admins(f"{session['username']} submitted the travel group '{name}' for review.", url_for("admin_travel_groups"))
+    notify(session["user_id"], f"Your group '{name}' is awaiting admin approval.", url_for("travel_groups"))
+    flash("Your travel group has been submitted for admin review. It'll be visible to other travellers once approved.", "success")
     return redirect(url_for("travel_groups"))
+
+
+
+
 
 
 @app.route("/travel_groups/<int:group_id>/join", methods=["POST"])
@@ -749,28 +998,149 @@ def join_travel_group(group_id):
         return redirect(url_for("login"))
 
     group = query(
-        """SELECT tg.max_members, tg.travel_date, COUNT(gm.id) AS member_count
+        """SELECT tg.name, tg.max_members, tg.travel_date, tg.status,
+                  SUM(gm.status = 'Confirmed') AS member_count
            FROM travel_groups tg LEFT JOIN group_members gm ON gm.group_id = tg.id
            WHERE tg.id = %s GROUP BY tg.id""",
         (group_id,), fetch="one",
     )
-    already_joined = query(
-        "SELECT id FROM group_members WHERE group_id = %s AND user_id = %s",
+    existing = query(
+        "SELECT id, status FROM group_members WHERE group_id = %s AND user_id = %s",
         (group_id, session["user_id"]), fetch="one",
     )
     if group is None:
         flash("That travel group is no longer available.", "error")
-    elif already_joined:
+    elif existing and existing["status"] == "Confirmed":
         flash("You have already joined this group.", "error")
+    elif existing and existing["status"] == "Pending":
+        flash("You've already requested to join this group and it's awaiting admin approval.", "error")
+    elif group["status"] != "Confirmed":
+        flash("This group hasn't been approved by an admin yet.", "error")
     elif group["travel_date"] < date.today():
         flash("This group's trip has already happened, so it's no longer accepting new members.", "error")
     elif group["member_count"] >= group["max_members"]:
         flash("This group is already full.", "error")
     else:
-        execute("INSERT INTO group_members (group_id, user_id) VALUES (%s, %s)",
-                (group_id, session["user_id"]))
-        flash("You joined the travel group successfully!", "success")
+        if existing:
+            # previously rejected -- let them try again
+            execute("UPDATE group_members SET status = 'Pending' WHERE id = %s", (existing["id"],))
+        else:
+            execute("INSERT INTO group_members (group_id, user_id, status) VALUES (%s, %s, 'Pending')",
+                    (group_id, session["user_id"]))
+        notify_admins(
+            f"{session['username']} requested to join the travel group '{group['name']}'.",
+            url_for("admin_travel_groups"),
+        )
+        notify(session["user_id"], f"Your request to join '{group['name']}' is awaiting admin approval.", url_for("travel_groups"))
+        flash("Your request to join has been sent to the admin for approval.", "success")
     return redirect(url_for("travel_groups"))
+
+
+# MANAGE TRAVEL GROUPS - ADMIN
+
+@app.route("/admin/travel_groups")
+def admin_travel_groups():
+
+    if "username" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("user") != 1:
+        return redirect(url_for("dashboard"))
+
+    groups = query(
+        """
+        SELECT tg.id, tg.name, tg.destination, tg.travel_date, tg.max_members,
+               tg.budget_range, tg.description, tg.status, tg.created_at,
+               u.full_name AS creator_name, u.username AS creator_username,
+               SUM(gm.status = 'Confirmed') AS member_count
+        FROM travel_groups tg
+        JOIN users u ON u.id = tg.created_by
+        LEFT JOIN group_members gm ON gm.group_id = tg.id
+        GROUP BY tg.id
+        ORDER BY tg.created_at DESC
+        """
+    )
+
+    grouped_groups = []
+    for status_name in ("Pending", "Confirmed", "Rejected"):
+        matches = [g for g in groups if g["status"] == status_name]
+        if matches:
+            grouped_groups.append((status_name, matches))
+
+    status_counts = {}
+    for g in groups:
+        status_counts[g["status"]] = status_counts.get(g["status"], 0) + 1
+
+    pending_members = query(
+        """
+        SELECT gm.id, tg.name AS group_name, tg.destination,
+               u.full_name AS traveller_name, u.username AS traveller_username
+        FROM group_members gm
+        JOIN travel_groups tg ON tg.id = gm.group_id
+        JOIN users u ON u.id = gm.user_id
+        WHERE gm.status = 'Pending'
+        ORDER BY gm.id
+        """
+    )
+
+    return render_template(
+        "admin_travel_groups.html",
+        groups=groups,
+        grouped_groups=grouped_groups,
+        pending_count=status_counts.get("Pending", 0),
+        confirmed_count=status_counts.get("Confirmed", 0),
+        rejected_count=status_counts.get("Rejected", 0),
+        pending_members=pending_members,
+    )
+
+
+@app.route("/admin/travel_groups/<int:group_id>/update-status", methods=["POST"])
+def update_group_status(group_id):
+
+    if "username" not in session or session.get("user") != 1:
+        return redirect(url_for("login"))
+
+    status = request.form.get("status", "")
+
+    if status not in ("Confirmed", "Rejected"):
+        flash("Please choose a valid group status.", "error")
+    else:
+        group = query("SELECT created_by, name, status FROM travel_groups WHERE id = %s", (group_id,), fetch="one")
+        execute("UPDATE travel_groups SET status = %s WHERE id = %s", (status, group_id))
+        if group and group["status"] != status:
+            notify(group["created_by"], f"Your travel group '{group['name']}' was {status.lower()}.", url_for("travel_groups"))
+        flash("Travel group status updated.", "success")
+
+    return redirect(url_for("admin_travel_groups"))
+
+
+@app.route("/admin/group_members/<int:member_id>/update-status", methods=["POST"])
+def update_group_member_status(member_id):
+
+    if "username" not in session or session.get("user") != 1:
+        return redirect(url_for("login"))
+
+    status = request.form.get("status", "")
+
+    if status not in ("Confirmed", "Rejected"):
+        flash("Please choose a valid membership status.", "error")
+    else:
+        member = query(
+            """SELECT gm.user_id, gm.status, tg.name AS group_name
+               FROM group_members gm JOIN travel_groups tg ON tg.id = gm.group_id
+               WHERE gm.id = %s""",
+            (member_id,), fetch="one",
+        )
+        execute("UPDATE group_members SET status = %s WHERE id = %s", (status, member_id))
+        if member and member["status"] != status:
+            notify(
+                member["user_id"],
+                f"Your request to join '{member['group_name']}' was {status.lower()}.",
+                url_for("travel_groups"),
+            )
+        flash("Membership request updated.", "success")
+
+    return redirect(url_for("admin_travel_groups"))
 
 
 # PROFILE
@@ -1184,11 +1554,97 @@ def update_booking_status(booking_id):
 
     else:
 
+        booking = query("SELECT user_id, package_name, status FROM bookings WHERE id = %s", (booking_id,), fetch="one")
         execute("UPDATE bookings SET status = %s WHERE id = %s", (status, booking_id))
+        if booking and booking["status"] != status:
+            notify(booking["user_id"], f"Your booking #{booking_id} for '{booking['package_name']}' is now {status.lower()}.", url_for("my_bookings"))
 
         flash("Booking status updated.", "success")
 
     return redirect(url_for("admin_bookings", search=search, status=status_filter))
+
+
+@app.route("/admin/reports")
+def admin_reports():
+    if "username" not in session:
+        return redirect(url_for("login"))
+    if session.get("user") != 1:
+        return redirect(url_for("dashboard"))
+
+    period = request.args.get("period", "all")
+    periods = {"all": "All time", "30": "Last 30 days", "90": "Last 90 days", "year": "This year"}
+    if period not in periods:
+        period = "all"
+    today = date.today()
+    start = (date(today.year, 1, 1) if period == "year" else
+             today - timedelta(days=int(period) - 1) if period in ("30", "90") else None)
+    sql = "SELECT package_name, price, travellers, status, created_at FROM bookings"
+    params = []
+    if start:
+        sql += " WHERE created_at >= %s AND created_at < %s"
+        params = [start, today + timedelta(days=1)]
+    bookings = query(sql + " ORDER BY created_at", tuple(params))
+    statuses = dict.fromkeys(("Pending", "Cancel Requested", "Confirmed", "Completed", "Cancelled"), 0)
+    packages = {}
+    months = {}
+    accepted_value = 0
+    accepted_travellers = 0
+    for booking in bookings:
+        status = booking["status"]
+        statuses[status] = statuses.get(status, 0) + 1
+        accepted = status in ("Confirmed", "Completed")
+        value = booking["price"] or 0
+        if accepted:
+            accepted_value += value
+            accepted_travellers += booking["travellers"] or 0
+        name = booking["package_name"] or "Unnamed package"
+        package = packages.setdefault(name, {"name": name, "bookings": 0, "value": 0})
+        package["bookings"] += 1
+        if accepted:
+            package["value"] += value
+        month = booking["created_at"].strftime("%Y-%m")
+        months[month] = months.get(month, 0) + 1
+
+    # Show a continuous timeline, including months without bookings.
+    first_month = (start or (bookings[0]["created_at"].date() if bookings else today)).replace(day=1)
+    timeline = []
+    month = first_month
+    while month <= today:
+        timeline.append({"label": month.strftime("%b %Y"), "count": months.get(month.strftime("%Y-%m"), 0)})
+        month = (month.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return render_template(
+        "admin_reports.html", period=period, periods=periods, today=today,
+        total=len(bookings), accepted_value=accepted_value, accepted_travellers=accepted_travellers,
+        needs_attention=statuses["Pending"] + statuses["Cancel Requested"],
+        statuses=statuses, timeline=timeline,
+        top_packages=sorted(packages.values(), key=lambda p: (-p["bookings"], p["name"]))[:5],
+        travellers=query("SELECT COUNT(*) AS total FROM users WHERE role = 0", fetch="one")["total"],
+        package_count=query("SELECT COUNT(*) AS total FROM packages", fetch="one")["total"],
+        group_count=query("SELECT COUNT(*) AS total FROM travel_groups", fetch="one")["total"],
+        place_count=len(get_places(PLACES)),
+    )
+
+
+# NOTIFICATIONS
+
+@app.route("/notifications")
+def notifications():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    items = query(
+        "SELECT id, message, link, is_read, created_at FROM notifications WHERE user_id = %s ORDER BY created_at DESC, id DESC",
+        (session["user_id"],),
+    )
+    return render_template("notifications.html", notifications=items, is_admin=session.get("user") == 1)
+
+
+@app.route("/notifications/read", methods=["POST"])
+def read_notifications():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    execute("UPDATE notifications SET is_read = 1 WHERE user_id = %s AND is_read = 0", (session["user_id"],))
+    return redirect(url_for("notifications"))
 
 
 # LOGOUT
@@ -1206,4 +1662,5 @@ def logout():
 if __name__ == "__main__":
     with app.app_context():
         ensure_group_columns()
+        ensure_notifications_table()
     app.run(debug=True)

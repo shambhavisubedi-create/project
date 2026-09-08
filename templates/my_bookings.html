@@ -22,37 +22,12 @@
       color: var(--t);
       font-family: Segoe UI,Arial
     }
-    .nav {
-      height: 72px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 max(24px,calc((100% - 1080px)/2));
-      border-bottom: 1px solid var(--l)
-    }
     a {
       text-decoration: none
     }
-    .brand,h1,h2 {
+    h1,h2 {
       font-family: Georgia,serif;
       color: var(--i)
-    }
-    .brand {
-      font-size: 23px;
-      font-weight: bold
-    }
-    .links {
-      display: flex;
-      gap: 20px;
-      align-items: center
-    }
-    .links a {
-      color: var(--t);
-      font-weight: 600;
-      font-size: 14px
-    }
-    .links .active {
-      color: var(--w)
     }
     .wrap {
       max-width: 1080px;
@@ -172,9 +147,6 @@
       font-weight: bold
     }
     @media(max-width:650px) {
-      .links a:not(.active) {
-        display: none
-      }
       .facts {
         grid-template-columns: 1fr
       }
@@ -183,16 +155,16 @@
       }
     }
   </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
 </head>
 <body>
-  <header class="nav">
-    <a class="brand" href="{{ url_for('dashboard') }}">GoGather</a>
-    <nav class="links">
-      <a href="{{ url_for('dashboard') }}">Dashboard</a>
-      <a href="{{ url_for('packages') }}">Packages</a>
-      <a class="active" href="{{ url_for('my_bookings') }}">My bookings</a>
-    </nav>
-  </header>
+<div class="app-shell">
+  {% include "_sidebar_traveller.html" %}
+  <div class="main">
+  {% set role_label = 'Traveller' %}
+  {% include "_topbar.html" %}
+
   <main class="wrap">
     <section class="hero">
       <div class="ey">Your trips</div>
@@ -250,5 +222,9 @@
       </div>
     {% endfor %}
   </main>
+
+  </div>
+</div>
+<script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
 </body>
 </html>

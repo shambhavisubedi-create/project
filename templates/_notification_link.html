@@ -1,0 +1,4 @@
+<a class="notification-link" href="{{ url_for('notifications') }}" title="Notifications" aria-label="Notifications{% if unread_notification_count|default(0) %}, {{ unread_notification_count }} unread{% endif %}" {% if request.endpoint == 'notifications' %}aria-current="page"{% endif %}>
+  <span class="notification-bell" aria-hidden="true"></span>
+  {% if unread_notification_count|default(0) %}<span class="notification-count" aria-hidden="true">{{ unread_notification_count }}</span>{% endif %}
+</a>
