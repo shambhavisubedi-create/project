@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ place.name }} Itinerary | GoGather</title>
+  <style>
+    :root {
+      --wine: #a9455c;
+      --wine-dark: #823246;
+      --ink: #2c2420;
+      --text: #51433d;
+      --muted: #82736b;
+      --cream: #fdf3ea;
+      --line: #eddfd4
+    }
+    * {
+      box-sizing: border-box
+    }
+    body {
+      margin: 0;
+      background: var(--cream);
+      color: var(--text);
+      font-family: Segoe UI,Arial,sans-serif
+    }
+    .nav {
+      height: 72px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 max(24px,calc((100% - 900px)/2))
+    }
+    .brand {
+      font: 700 23px Georgia,serif;
+      color: var(--ink);
+      text-decoration: none
+    }
+    .back {
+      color: var(--wine);
+      font-weight: 700;
+      text-decoration: none;
+      font-size: 14px
+    }
+    .wrap {
+      max-width: 900px;
+      margin: auto;
+      padding: 34px 24px 70px
+    }
+    .hero {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 34px;
+      background: linear-gradient(120deg,#f8dad6,#f7e7d8)
+    }
+    .tag {
+      color: var(--wine);
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      font-size: 11px;
+      font-weight: 700
+    }
+    h1, h2 {
+      font-family: Georgia,serif;
+      color: var(--ink)
+    }
+    h1 {
+      font-size: clamp(28px,4.5vw,42px);
+      margin: 8px 0
+    }
+    .hero p {
+      max-width: 620px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin: 0 0 18px
+    }
+    .hero-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px
+    }
+    .hero-fact {
+      background: rgba(255,255,255,.6);
+      border-radius: 8px;
+      padding: 8px 13px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #74414b
+    }
+    .section {
+      margin-top: 30px
+    }
+    .section h2 {
+      font-size: 24px;
+      margin: 0 0 14px
+    }
+    .itinerary-day {
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 18px;
+      border: 1px solid var(--line);
+      background: #fffdfa;
+      box-shadow: 0 4px 14px rgba(67,41,29,.05)
+    }
+    .itinerary-day:last-child {
+      margin-bottom: 0
+    }
+    .itinerary-day-head {
+      background: var(--ink);
+      color: #fff;
+      padding: 16px 20px;
+      display: flex;
+      align-items: baseline;
+      gap: 14px
+    }
+    .itinerary-day-badge {
+      font-family: Georgia,serif;
+      font-size: 26px;
+      font-weight: 700;
+      color: #f0b8a8;
+      white-space: nowrap
+    }
+    .itinerary-day-title {
+      font-size: 16px;
+      font-weight: 600
+    }
+    .itinerary-table {
+      width: 100%;
+      border-collapse: collapse
+    }
+    .itinerary-table th {
+      background: var(--wine);
+      color: #fff;
+      text-align: left;
+      padding: 9px 20px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      font-weight: 700
+    }
+    .itinerary-table th.time-col {
+      width: 90px
+    }
+    .itinerary-table td {
+      padding: 11px 20px;
+      border-bottom: 1px solid var(--line);
+      font-size: 14px;
+      color: var(--text);
+      vertical-align: top
+    }
+    .itinerary-table tr:last-child td {
+      border-bottom: 0
+    }
+    .itinerary-table td.time-col {
+      font-weight: 700;
+      color: var(--wine);
+      white-space: nowrap
+    }
+    .panel {
+      background: #fffdfa;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 24px
+    }
+    .panel ul {
+      margin: 0;
+      padding-left: 20px;
+      line-height: 1.8;
+      font-size: 14px;
+      color: var(--text)
+    }
+    .info-panel {
+      background: #f8ebe5;
+      border: none
+    }
+    .info-panel ul {
+      color: #74414b
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px
+    }
+    .cta {
+      margin-top: 34px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap
+    }
+    .cta a {
+      display: inline-block;
+      text-decoration: none;
+      font-weight: 700;
+      padding: 13px 22px;
+      border-radius: 10px;
+      font-size: 14px
+    }
+    .cta .book {
+      background: var(--wine);
+      color: #fff
+    }
+    .cta .book:hover {
+      background: var(--wine-dark)
+    }
+    .cta .outline {
+      border: 1px solid var(--wine);
+      color: var(--wine)
+    }
+    @media(max-width:720px) {
+      .two-col {
+        grid-template-columns: 1fr
+      }
+      .hero {
+        padding: 26px
+      }
+      .itinerary-table th.time-col, .itinerary-table td.time-col {
+        width: 66px
+      }
+    }
+  </style>
+{% include "_ui_head.html" %}
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="{{ url_for('dashboard') }}">GoGather</a>
+    <a class="back" href="{{ url_for('place_detail', slug=place.slug) }}">← Back to destination</a>
+  </header>
+  <main class="wrap">
+    <section class="hero">
+      <div class="tag">{{ place.region }} &middot; {{ place.category }} &middot; Full itinerary</div>
+      <h1>{{ place.name }}</h1>
+      <p>{{ place.description }}</p>
+      <div class="hero-facts">
+        <span class="hero-fact">{{ place.days }}</span>
+        <span class="hero-fact">{{ place.best_time }}</span>
+        <span class="hero-fact">{{ place.budget }}</span>
+      </div>
+    </section>
+
+    <div class="section">
+      <h2>Suggested day-by-day plan</h2>
+      {% for day in itinerary %}
+        <div class="itinerary-day">
+          <div class="itinerary-day-head">
+            <span class="itinerary-day-badge">Day {{ day.day_number }}</span>
+            <span class="itinerary-day-title">{{ day.title }}</span>
+          </div>
+          <table class="itinerary-table">
+            <thead>
+              <tr><th class="time-col">Time</th><th>Activity</th></tr>
+            </thead>
+            <tbody>
+              {% for step in day.activities %}
+                <tr><td class="time-col">{{ step.time }}</td><td>{{ step.activity }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="section two-col">
+      <div class="panel">
+        <h2 style="font-size:19px;margin-top:0">What to pack</h2>
+        <ul>
+          {% for item in packing_list %}<li>{{ item }}</li>{% endfor %}
+        </ul>
+      </div>
+      <div class="panel">
+        <h2 style="font-size:19px;margin-top:0">Things to know before you go</h2>
+        <ul>
+          {% for item in things_to_know %}<li>{{ item }}</li>{% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <div class="section panel info-panel">
+      <h2 style="font-size:19px;margin-top:0">Important information</h2>
+      <ul>
+        <li>Emergency contacts in Nepal: Nepal Police 100 &middot; Tourist Police 1144 &middot; Ambulance 102 &middot; Fire 101.</li>
+        <li>Carry a printed or digital copy of any booking confirmation and a valid photo ID throughout your trip.</li>
+        <li>Currency is the Nepalese Rupee (NPR) &mdash; carry some cash, as cards aren't accepted everywhere outside Kathmandu and Pokhara.</li>
+        <li>Useful Nepali phrases: Namaste (hello), Dhanyabad (thank you), Kasto cha? (how are you?).</li>
+        <li>Timings above are a guide &mdash; a guide may adjust the order slightly for weather, traffic, or local conditions.</li>
+      </ul>
+    </div>
+
+    <div class="cta">
+      <a class="book" href="{{ url_for('book_package') }}">Browse packages to this area</a>
+      <a class="outline" href="{{ url_for('place_detail', slug=place.slug) }}">← Back to destination</a>
+    </div>
+  </main>
+{% include "_ui_foot.html" %}
+</body>
+</html>

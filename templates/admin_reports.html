@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='admin_reports.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
 </head>
 <body>
 <div class="app-shell">
@@ -23,13 +24,16 @@
     <label for="period">Booking period</label>
     <select id="period" name="period">{% for value, label in periods.items() %}<option value="{{ value }}" {% if period == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
     <button type="submit" class="btn">Update report</button>
+    <a class="btn btn-outline" href="{{ url_for('export_reports_csv', period=period) }}">Download CSV</a>
     <span>Based on when bookings were created.</span>
   </form>
   <section class="stats" aria-label="Booking summary">
-    <article class="stat"><p>Total bookings</p><strong>{{ total }}</strong><small>{{ periods[period] }}</small></article>
-    <article class="stat accent"><p>Confirmed &amp; completed value</p><strong>{{ accepted_value|npr }}</strong><small>Booking value, not payments collected</small></article>
-    <article class="stat"><p>Travellers booked</p><strong>{{ accepted_travellers }}</strong><small>Traveller spots on confirmed &amp; completed bookings</small></article>
-    <article class="stat"><p>Awaiting a decision</p><strong>{{ needs_attention }}</strong><small>Pending bookings &amp; cancellation requests</small></article>
+    <a class="stat" href="{{ url_for('admin_bookings') }}"><p>Total bookings</p><strong>{{ total }}</strong><small>{{ periods[period] }}</small></a>
+    <a class="stat accent" href="{{ url_for('admin_bookings', status='Confirmed,Completed') }}"><p>Confirmed &amp; completed value</p><strong>{{ accepted_value|npr }}</strong><small>Booking value, not payments collected</small></a>
+    <a class="stat" href="{{ url_for('admin_bookings', payment='Paid') }}"><p>Payments received</p><strong>{{ paid_value|npr }}</strong><small>{{ paid_count }} booking{{ 's' if paid_count != 1 }} paid via eSewa or card</small></a>
+    <a class="stat accent" href="{{ url_for('admin_bookings', payment='Paid') }}"><p>Margin on payments received</p><strong>{{ paid_margin|npr }}</strong><small>Price minus supplier cost, before cancellation fees</small></a>
+    <a class="stat" href="{{ url_for('admin_bookings', status='Confirmed,Completed') }}"><p>Travellers booked</p><strong>{{ accepted_travellers }}</strong><small>Traveller spots on confirmed &amp; completed bookings</small></a>
+    <a class="stat" href="{{ url_for('admin_bookings', status='Pending,Cancel Requested') }}"><p>Awaiting a decision</p><strong>{{ needs_attention }}</strong><small>Pending bookings &amp; cancellation requests</small></a>
   </section>
   {% if not total %}<div class="empty"><h2>No bookings in this period yet.</h2><p>Try a wider period, or check back when travellers start planning their trips.</p></div>{% endif %}
   <div class="report-grid">
@@ -90,5 +94,6 @@
     }]
   });
 </script>
+{% include "_ui_foot.html" %}
 </body>
 </html>

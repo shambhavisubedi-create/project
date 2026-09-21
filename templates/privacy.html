@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoGather - Privacy Policy</title>
+<style>
+  :root {
+    --primary: #a9455c;
+    --primary-dark: #8a3549;
+    --primary-light: #fbe4e6;
+    --charcoal: #2c2420;
+    --text: #4a3d38;
+    --text-muted: #8a7b73;
+    --border: #f0e3d5;
+    --bg: #fdf3ea;
+    --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: var(--bg); color: var(--text); }
+  a { color: var(--primary-dark); }
+  .navbar { background: var(--bg); border-bottom: 1px solid var(--border); }
+  .navbar-inner { max-width: 900px; margin: 0 auto; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; color: var(--charcoal); text-decoration: none; }
+  main { max-width: 780px; margin: 0 auto; padding: 40px 28px 70px; }
+  h1 { font-family: var(--font-display); color: var(--charcoal); font-size: 2rem; margin: 0 0 6px; }
+  .updated { color: var(--text-muted); font-size: 0.85rem; margin: 0 0 30px; }
+  h2 { font-family: var(--font-display); color: var(--charcoal); font-size: 1.3rem; margin: 34px 0 10px; }
+  p, li { line-height: 1.7; font-size: 0.95rem; }
+  ul { padding-left: 20px; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 28px 32px; }
+  .back { display: inline-block; margin-top: 30px; font-weight: 600; }
+</style>
+{% include "_ui_head.html" %}
+</head>
+<body>
+  <div class="navbar"><div class="navbar-inner"><a class="brand" href="{{ url_for('landing') }}">GoGather</a></div></div>
+  <main>
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: for the GoGather platform, covering account, booking and payment data.</p>
+    <div class="card">
+      <p>GoGather ("we", "us") runs a travel booking platform for trips within Nepal. This page explains what
+      information we collect from you, why, and how it's handled.</p>
+
+      <h2>What we collect</h2>
+      <ul>
+        <li><strong>Account details</strong> -- full name, username, email address and phone number, when you register.</li>
+        <li><strong>Booking details</strong> -- the packages you book, travel dates, traveller counts, and any cancellation
+          or refund requests you submit.</li>
+        <li><strong>Payment information</strong> -- we do not store your card or eSewa credentials ourselves. Card payments
+          are processed by Stripe and eSewa payments by eSewa directly; we only keep a transaction reference and the
+          amount paid.</li>
+        <li><strong>Profile photo</strong> -- if you choose to upload one, plus a short history of previous photos so you
+          can restore an earlier one.</li>
+        <li><strong>Reviews</strong> -- any rating or comment you leave on a completed trip, shown publicly against your
+          name on that package's page.</li>
+        <li><strong>Session data</strong> -- a login session cookie so you stay signed in; it identifies your account, not
+          you personally, and is not used for advertising or tracking across other sites.</li>
+      </ul>
+
+      <h2>Why we collect it</h2>
+      <ul>
+        <li>To create and manage your account, and to let you log back in.</li>
+        <li>To process and manage your bookings, payments, cancellations and refunds.</li>
+        <li>To contact you about a booking's status (currently shown in-app; phone/email notifications are planned but
+          not live yet).</li>
+        <li>To let an admin review and approve bookings, travel groups and refund requests, as a safeguard against
+          fraudulent listings or bookings.</li>
+      </ul>
+
+      <h2>Who can see it</h2>
+      <p>Your booking, payment and contact details are visible only to you and to GoGather admins who manage bookings.
+      A review you leave is shown publicly with your name on the relevant package page. Other travellers in a travel
+      group you join can see your name and messages within that group's chat.</p>
+
+      <h2>How long we keep it</h2>
+      <p>We keep your account and booking history for as long as your account exists, so you can view your past trips
+      and receipts. If you'd like your account and its data removed, contact an admin to request deletion.</p>
+
+      <h2>Your choices</h2>
+      <ul>
+        <li>You can update your profile details, phone number and photo at any time from your Profile page.</li>
+        <li>You can reset your password from the login page if you forget it.</li>
+        <li>You can request cancellation of a booking, or removal of your account, through GoGather support.</li>
+      </ul>
+
+      <h2>Security</h2>
+      <p>Passwords are stored as salted hashes, never in plain text. Every form that changes your data is protected
+      against cross-site request forgery, and login attempts are rate-limited to reduce the risk of a brute-force
+      attack on your account.</p>
+
+      <h2>Contact</h2>
+      <p>Questions about this policy or your data can be directed to a GoGather admin through the platform.</p>
+    </div>
+    <a class="back" href="{{ url_for('landing') }}">&larr; Back to GoGather</a>
+  </main>
+{% include "_ui_foot.html" %}
+</body>
+</html>

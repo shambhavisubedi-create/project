@@ -69,12 +69,21 @@
 
   .empty { text-align: center; color: var(--text-muted); padding: 30px; }
 
+  .comm-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .comm-label { color: var(--text-muted); font-size: 0.8rem; font-weight: 600; }
+  .comm-btn { border: 1px solid var(--border); background: white; color: var(--text); padding: 6px 13px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+  .comm-btn:hover { border-color: var(--primary); }
+  .comm-btn.active.mode-2 { background: #e5f3ec; color: #286650; border-color: #b7dcc8; }
+  .comm-btn.active.mode-1 { background: #fdead1; color: #8a5a1c; border-color: #f2d19b; }
+  .comm-btn.active.mode-0 { background: #f9e6e8; color: #9b3544; border-color: #ebc1c7; }
+
   @media (max-width: 700px) {
     .stats { grid-template-columns: 1fr; }
   }
 </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
 </head>
 <body>
 <div class="app-shell">
@@ -124,11 +133,11 @@
           </div>
         </div>
         <div class="action-row">
-          <form method="post" action="{{ url_for('update_group_member_status', member_id=member.id) }}">
+          <form method="post" action="{{ url_for('update_group_member_status', member_id=member.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="status" value="Confirmed">
             <button type="submit" class="btn-approve">Approve</button>
           </form>
-          <form method="post" action="{{ url_for('update_group_member_status', member_id=member.id) }}">
+          <form method="post" action="{{ url_for('update_group_member_status', member_id=member.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="status" value="Rejected">
             <button type="submit" class="btn-decline">Decline</button>
           </form>
@@ -168,14 +177,26 @@
 
           {% if group.status == 'Pending' %}
             <div class="action-row">
-              <form method="post" action="{{ url_for('update_group_status', group_id=group.id) }}">
+              <form method="post" action="{{ url_for('update_group_status', group_id=group.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="status" value="Confirmed">
                 <button type="submit" class="btn-approve">Confirm group</button>
               </form>
-              <form method="post" action="{{ url_for('update_group_status', group_id=group.id) }}">
+              <form method="post" action="{{ url_for('update_group_status', group_id=group.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="status" value="Rejected">
                 <button type="submit" class="btn-decline">Reject</button>
               </form>
+            </div>
+          {% endif %}
+
+          {% if group.status == 'Confirmed' %}
+            <div class="comm-row">
+              <span class="comm-label">Communication:</span>
+              {% for mode, label in [(2, 'Two-way'), (1, 'One-way'), (0, 'Blocked')] %}
+                <form method="post" action="{{ url_for('update_group_communication', group_id=group.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="communication_mode" value="{{ mode }}">
+                  <button type="submit" class="comm-btn mode-{{ mode }} {{ 'active' if group.communication_mode == mode }}">{{ label }}</button>
+                </form>
+              {% endfor %}
             </div>
           {% endif %}
         </div>
@@ -190,5 +211,6 @@
   </div>
 </div>
 <script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+{% include "_ui_foot.html" %}
 </body>
 </html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search - GoGather</title>
+<style>
+  :root { --primary: #a9455c; --primary-dark: #8a3549; --primary-light: #fbe4e6; --charcoal: #2c2420; --text: #4a3d38; --muted: #8a7b73; --border: #f0e3d5; --bg: #fdf3ea; --card: #fffbf5; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; }
+  a { color: var(--primary-dark); text-decoration: none; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 36px 22px 60px; }
+  h1, h2 { font-family: Georgia, serif; color: var(--charcoal); }
+  h1 { margin: 0 0 6px; }
+  .intro { color: var(--muted); margin: 0 0 28px; }
+  h2 { margin: 30px 0 12px; font-size: 1.3rem; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 18px; margin-bottom: 10px; }
+  .row strong { color: var(--charcoal); display: block; }
+  .row span.meta { color: var(--muted); font-size: 0.85rem; }
+  .actions { display: flex; align-items: center; gap: 12px; }
+  .actions a { font-weight: 700; font-size: 0.88rem; }
+  .actions .book { background: var(--primary); color: #fff; padding: 8px 16px; border-radius: 999px; }
+  .wish-btn { border: 1px solid var(--primary); background: #fff; color: var(--primary); width: 38px; height: 38px; border-radius: 50%; font-size: 1.05rem; cursor: pointer; }
+  .wish-btn.saved { background: var(--primary); color: #fff; }
+  .empty { text-align: center; color: var(--muted); background: var(--card); border: 1px dashed var(--border); border-radius: 16px; padding: 44px 20px; }
+  .empty a { font-weight: 700; }
+</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
+</head>
+<body>
+<div class="app-shell">
+  {% include "_sidebar_traveller.html" %}
+  <div class="main">
+  {% set role_label = 'Traveller' %}
+  {% include "_topbar.html" %}
+
+  <main class="wrap">
+    <h1>Search</h1>
+    {% if q|length < 2 %}
+      <p class="intro">Type at least 2 letters in the search box above to find destinations and packages.</p>
+    {% else %}
+      <p class="intro">Results for &ldquo;{{ q }}&rdquo;: {{ places|length }} destination{{ '' if places|length == 1 else 's' }}, {{ packages|length }} package{{ '' if packages|length == 1 else 's' }}.</p>
+
+      <h2>Destinations</h2>
+      {% for place in places %}
+        <div class="row">
+          <div>
+            <strong>{{ place.name }}</strong>
+            <span class="meta">{{ place.region }} · {{ place.category }} · Best time: {{ place.best_time }}</span>
+          </div>
+          <div class="actions">
+            <a href="{{ url_for('place_detail', slug=place.slug) }}">View guide</a>
+            <form method="post" action="{{ url_for('toggle_place_wishlist', place_id=place.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <button class="wish-btn {{ 'saved' if place.id in wishlisted_place_ids else '' }}" type="submit" title="{{ 'Remove from wishlist' if place.id in wishlisted_place_ids else 'Save to wishlist' }}">{{ '♥' if place.id in wishlisted_place_ids else '♡' }}</button>
+            </form>
+          </div>
+        </div>
+      {% else %}
+        <div class="empty">No destinations match. <a href="{{ url_for('explore_places') }}">Browse all places</a></div>
+      {% endfor %}
+
+      <h2>Packages</h2>
+      {% for package in packages %}
+        <div class="row">
+          <div>
+            <strong>{{ package.name }}</strong>
+            <span class="meta">{{ package.duration_days }} days · {{ package.hotel_type|capitalize }} · {{ package.transport_mode|capitalize }} · {{ package.price|npr }} per traveller</span>
+          </div>
+          <div class="actions">
+            <a href="{{ url_for('package_detail', package_id=package.id) }}">Details</a>
+            <a class="book" href="{{ url_for('book_package', package_id=package.id) }}">Book</a>
+            <form method="post" action="{{ url_for('toggle_wishlist', package_id=package.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <button class="wish-btn {{ 'saved' if package.id in wishlisted_ids else '' }}" type="submit" title="{{ 'Remove from wishlist' if package.id in wishlisted_ids else 'Save to wishlist' }}">{{ '♥' if package.id in wishlisted_ids else '♡' }}</button>
+            </form>
+          </div>
+        </div>
+      {% else %}
+        <div class="empty">No packages match. <a href="{{ url_for('packages') }}">Browse all packages</a></div>
+      {% endfor %}
+    {% endif %}
+  </main>
+
+  </div>
+</div>
+<script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+{% include "_ui_foot.html" %}
+</body>
+</html>

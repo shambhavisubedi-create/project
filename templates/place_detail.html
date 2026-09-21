@@ -143,12 +143,100 @@
       font-size: 13px;
       margin-top: 4px
     }
+    .wish-btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      background: #fff;
+      border: 1px solid var(--wine);
+      color: var(--wine);
+      border-radius: 10px;
+      padding: 12px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 18px
+    }
+    .wish-btn.saved {
+      background: var(--wine);
+      color: #fff
+    }
+    .book {
+      display: block;
+      text-align: center;
+      background: var(--wine);
+      color: #fff;
+      border-radius: 10px;
+      padding: 12px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 14px;
+      margin-top: 10px
+    }
+    .pkg-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; padding: 12px 0; border-bottom: 1px solid var(--line) }
+    .pkg-row:last-of-type { border: 0 }
+    .pkg-row strong { color: var(--ink); display: block }
+    .pkg-row span { color: var(--muted); font-size: 13px }
+    .pkg-actions { display: flex; align-items: center; gap: 12px }
+    .pkg-actions b { color: var(--wine) }
+    .pkg-actions a { color: var(--wine); font-weight: 700; text-decoration: none; font-size: 14px }
+    .pkg-actions .pkg-book { background: var(--wine); color: #fff; padding: 8px 16px; border-radius: 8px }
     .similar a {
       display: inline-block;
       margin: 0 12px 10px 0;
       color: var(--wine);
       font-weight: 700;
       text-decoration: none
+    }
+    .gallery-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px
+    }
+    .gallery-item {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      height: 110px
+    }
+    .gallery-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover
+    }
+    .gallery-item span {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(0deg, rgba(32,22,17,.75), transparent);
+      color: #fff;
+      font-size: 11px;
+      padding: 16px 8px 6px
+    }
+    .itinerary-teaser {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap
+    }
+    .itinerary-teaser p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      max-width: 480px
+    }
+    .itinerary-link {
+      display: inline-block;
+      background: var(--wine);
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+      text-decoration: none;
+      padding: 13px 20px;
+      border-radius: 10px;
+      white-space: nowrap
     }
     @media(max-width:720px) {
       .layout {
@@ -163,6 +251,7 @@
       }
     }
   </style>
+{% include "_ui_head.html" %}
 </head>
 <body>
   <header class="nav">
@@ -178,11 +267,49 @@
         <p>{{ place.description }}</p>
       </div>
     </section>
+    {% if photos %}
+    <section class="panel" style="margin-top:28px">
+      <h2>Photo gallery</h2>
+      <div class="gallery-strip">
+        {% for photo in photos %}
+          <div class="gallery-item">
+            <img src="{{ url_for('static', filename=photo.image) }}" alt="{{ photo.caption or place.name }}">
+            {% if photo.caption %}<span>{{ photo.caption }}</span>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
     <div class="layout">
       <div>
         <section class="panel">
           <h2>Why visit</h2>
           <p>{{ place.description }} Plan around the season, choose a comfortable pace, and allow time to experience the local culture beyond the main sights.</p>
+        </section>
+        <section class="panel" id="packages">
+          <h2>Packages to {{ place.name }}</h2>
+          {% for pkg in place_packages %}
+            <div class="pkg-row">
+              <div>
+                <strong>{{ pkg.name }}</strong>
+                <span>{{ pkg.duration_days }} days · {{ pkg.hotel_type|capitalize }} · {{ pkg.transport_mode|capitalize }}</span>
+              </div>
+              <div class="pkg-actions">
+                <b>{{ pkg.price|npr }}</b>
+                <a href="{{ url_for('package_detail', package_id=pkg.id) }}">Details</a>
+                <a class="pkg-book" href="{{ url_for('book_package', package_id=pkg.id) }}">Book</a>
+              </div>
+            </div>
+          {% else %}
+            <p>No packages visit {{ place.name }} yet. Save it to your wishlist and check back soon.</p>
+          {% endfor %}
+        </section>
+        <section class="panel itinerary-teaser">
+          <div>
+            <h2 style="margin-top:0">Itinerary</h2>
+            <p>See a suggested day-by-day plan, timings, what to pack, and things to know before you go.</p>
+          </div>
+          <a class="itinerary-link" href="{{ url_for('place_itinerary_page', slug=place.slug) }}">View full itinerary →</a>
         </section>
         <section class="panel">
           <h2>Highlights</h2>
@@ -213,6 +340,17 @@
           <h3>Expected weather</h3>
           <span>{{ place.weather }}</span>
         </div>
+        {% if place.how_to_reach %}
+        <div class="fact">
+          <h3>How to reach</h3>
+          <span>{{ place.how_to_reach }}</span>
+        </div>
+        {% endif %}
+        <form method="post" action="{{ url_for('toggle_place_wishlist', place_id=place.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <button class="wish-btn {{ 'saved' if place.id in wishlisted_place_ids else '' }}" type="submit" data-keep-label data-saved-label="♥ Saved to wishlist" data-unsaved-label="♡ Save to wishlist">{{ '♥ Saved to wishlist' if place.id in wishlisted_place_ids else '♡ Save to wishlist' }}</button>
+        </form>
+        <a class="book" href="{{ url_for('packages', search=place.package_search_term) }}">View packages to {{ place.name }} →</a>
       </aside>
     </div>
     {% if similar_places %}
@@ -222,5 +360,6 @@
       </section>
     {% endif %}
   </main>
+{% include "_ui_foot.html" %}
 </body>
 </html>

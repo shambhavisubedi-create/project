@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Redirecting to eSewa…</title>
+</head>
+<body>
+  <p>Redirecting you to eSewa to complete your payment…</p>
+  <form id="esewaForm" method="POST" action="{{ form_url }}">
+    {% for name, value in fields.items() %}
+      <input type="hidden" name="{{ name }}" value="{{ value }}">
+    {% endfor %}
+  </form>
+  <script>document.getElementById("esewaForm").submit();</script>
+</body>
+</html>

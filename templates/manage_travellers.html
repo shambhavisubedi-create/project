@@ -53,6 +53,9 @@
 
   .traveller-row { border-bottom: 1px solid var(--border); padding: 16px 0; }
   .traveller-row:last-child { border-bottom: none; }
+  .pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 18px 0; font-size: 0.85rem; color: var(--text-muted); }
+  .pagination a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+  .pagination a:hover { text-decoration: underline; }
   .traveller-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .traveller-name { font-weight: 700; color: var(--charcoal); }
   .traveller-meta { color: var(--text-muted); font-size: 0.85rem; margin-top: 2px; }
@@ -67,6 +70,7 @@
 </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
 </head>
 <body>
 <div class="app-shell">
@@ -88,7 +92,7 @@
 
   <section class="card">
     <h2>Add a traveller</h2>
-    <form method="POST" action="{{ url_for('manage_travellers') }}">
+    <form method="POST" action="{{ url_for('manage_travellers') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="form-grid">
         <div>
           <label for="full_name">Full name</label>
@@ -128,7 +132,7 @@
             <div class="traveller-meta">{{ traveller.email }}{% if traveller.phone %} &middot; {{ traveller.phone }}{% endif %}</div>
           </div>
           <div class="traveller-actions">
-            <form method="post" action="{{ url_for('delete_traveller', user_id=traveller.id) }}" onsubmit="return confirm('Remove this traveller? This also deletes their bookings and group memberships.')">
+            <form method="post" action="{{ url_for('delete_traveller', user_id=traveller.id) }}" onsubmit="return confirm('Remove this traveller? This also deletes their bookings and group memberships.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-danger">Delete</button>
             </form>
           </div>
@@ -136,7 +140,7 @@
 
         <details class="edit-panel">
           <summary>Edit details</summary>
-          <form method="post" action="{{ url_for('update_traveller', user_id=traveller.id) }}" class="edit-form">
+          <form method="post" action="{{ url_for('update_traveller', user_id=traveller.id) }}" class="edit-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-grid">
               <div>
                 <label>Full name</label>
@@ -162,10 +166,19 @@
     {% endfor %}
   </section>
 
+  {% if total_pages > 1 %}
+    <nav class="pagination">
+      {% if page > 1 %}<a href="{{ url_for('manage_travellers', page=page-1) }}">&larr; Previous</a>{% endif %}
+      <span>Page {{ page }} of {{ total_pages }}</span>
+      {% if page < total_pages %}<a href="{{ url_for('manage_travellers', page=page+1) }}">Next &rarr;</a>{% endif %}
+    </nav>
+  {% endif %}
+
 </main>
 
   </div>
 </div>
 <script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+{% include "_ui_foot.html" %}
 </body>
 </html>

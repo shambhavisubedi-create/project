@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoGather - Cancellation Fee Revenue</title>
+<style>
+  :root {
+    --primary: #a9455c;
+    --primary-dark: #8a3549;
+    --primary-light: #fbe4e6;
+    --charcoal: #2c2420;
+    --text: #4a3d38;
+    --text-muted: #8a7b73;
+    --border: #f0e3d5;
+    --bg: #fdf3ea;
+    --white: #ffffff;
+    --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 45px 28px; }
+
+  h1 { font-family: var(--font-display); color: var(--charcoal); font-size: 2rem; margin: 0 0 8px; }
+  .subtitle { color: var(--text-muted); margin: 0 0 24px; }
+
+  .fee-source-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    background: #e5f3ec;
+    border: 1px solid #b9ddc9;
+    border-radius: 16px;
+    padding: 18px 20px;
+    margin-bottom: 28px;
+  }
+  .fee-source-icon { font-size: 1.6rem; line-height: 1; }
+  .fee-source-title { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: #1f5140; margin-bottom: 4px; }
+  .fee-source-desc { font-size: 0.85rem; color: #286650; }
+
+  .card { background: var(--white); border: 1px solid var(--border); border-radius: 16px; padding: 26px; box-shadow: 0 5px 18px rgba(80, 50, 40, 0.05); margin-bottom: 28px; }
+  .card h2 { font-family: var(--font-display); color: var(--charcoal); font-size: 1.3rem; margin: 0 0 18px; }
+
+  .package-row { margin-bottom: 20px; }
+  .package-row:last-child { margin-bottom: 0; }
+  .package-row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+  .package-name { font-weight: 700; color: var(--charcoal); }
+  .package-fee { font-weight: 700; color: var(--primary-dark); white-space: nowrap; }
+  .package-meta { color: var(--text-muted); font-size: 0.78rem; }
+
+  .bar-track { background: var(--bg); border-radius: 999px; height: 14px; overflow: hidden; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--primary-dark)); border-radius: 999px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 12px; font-size: 0.88rem; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-muted); font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+
+  .empty { text-align: center; color: var(--text-muted); padding: 30px; }
+
+  @media (max-width: 700px) {
+    table, thead, tbody, tr { display: block; }
+    thead { display: none; }
+    tr { border-bottom: 1px solid var(--border); padding: 10px 0; }
+    td { border: none; padding: 4px 0; display: flex; justify-content: space-between; }
+    td::before { content: attr(data-label); font-weight: 700; color: var(--text-muted); margin-right: 12px; }
+  }
+</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
+</head>
+<body>
+<div class="app-shell">
+  {% include "_sidebar_admin.html" %}
+  <div class="main">
+  {% set role_label = 'Admin' %}
+  {% include "_topbar.html" %}
+
+<main class="container">
+
+  <h1>Cancellation Fee Revenue</h1>
+  <p class="subtitle">Where the 20% cancellation fee has actually been extracted from, broken down by package.</p>
+
+  <section class="fee-source-banner">
+    <div class="fee-source-icon">&#128176;</div>
+    <div>
+      <div class="fee-source-title">{{ total_fee|npr }} extracted in total</div>
+      <div class="fee-source-desc">
+        From {{ total_refunds }} completed refund{{ '' if total_refunds == 1 else 's' }} across
+        {{ by_package|length }} package{{ '' if by_package|length == 1 else 's' }}. This is the
+        same figure included in "Total Revenue Collected" on the
+        <a href="{{ url_for('admin_dashboard') }}">Dashboard</a>.
+      </div>
+    </div>
+  </section>
+
+  {% if by_package %}
+  <section class="card">
+    <h2>By package</h2>
+    {% for row in by_package %}
+      <div class="package-row">
+        <div class="package-row-top">
+          <div>
+            <div class="package-name">{{ row.package_name }}</div>
+            <div class="package-meta">{{ row.refund_count }} cancellation{{ '' if row.refund_count == 1 else 's' }} &middot; {{ row.share_percent }}% of total fee revenue</div>
+          </div>
+          <div class="package-fee">{{ row.total_fee|npr }} extracted</div>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width: {{ row.bar_percent }}%;"></div>
+        </div>
+      </div>
+    {% endfor %}
+  </section>
+
+  <section class="card">
+    <h2>Full breakdown</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Package</th>
+          <th class="num">Cancellations</th>
+          <th class="num">Total paid</th>
+          <th class="num">Total refunded to travellers</th>
+          <th class="num">Fee extracted</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in by_package %}
+          <tr>
+            <td data-label="Package">{{ row.package_name }}</td>
+            <td class="num" data-label="Cancellations">{{ row.refund_count }}</td>
+            <td class="num" data-label="Total paid">{{ row.total_original|npr }}</td>
+            <td class="num" data-label="Refunded">{{ row.total_refunded|npr }}</td>
+            <td class="num" data-label="Fee extracted">{{ row.total_fee|npr }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% else %}
+  <section class="card">
+    <div class="empty">No cancellation fees have been collected yet.</div>
+  </section>
+  {% endif %}
+
+</main>
+
+  </div>
+</div>
+<script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+{% include "_ui_foot.html" %}
+</body>
+</html>

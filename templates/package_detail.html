@@ -91,6 +91,12 @@
       font-size: 26px;
       margin: 0 0 16px
     }
+    .review-list { display: flex; flex-direction: column; gap: 14px }
+    .review-item { border-bottom: 1px solid var(--line); padding-bottom: 12px }
+    .review-item:last-child { border-bottom: none; padding-bottom: 0 }
+    .review-item-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: #b8853f; font-size: 15px }
+    .review-item-head span { color: var(--muted); font-size: 12.5px; font-weight: 400 }
+    .review-item p { margin: 6px 0 0; color: var(--ink); font-size: 14px; line-height: 1.6 }
     .list {
       display: flex;
       flex-wrap: wrap;
@@ -140,11 +146,159 @@
       font-weight: 700;
       margin-top: 20px
     }
+    .wish-btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      background: #fff;
+      border: 1px solid var(--wine);
+      color: var(--wine);
+      border-radius: 10px;
+      padding: 12px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 10px
+    }
+    .wish-btn.saved {
+      background: var(--wine);
+      color: #fff
+    }
     .note {
       font-size: 12px;
       color: var(--muted);
       text-align: center;
       line-height: 1.45
+    }
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px
+    }
+    .gallery-item {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      height: 110px
+    }
+    .gallery-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover
+    }
+    .gallery-item span {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(0deg, rgba(32,22,17,.75), transparent);
+      color: #fff;
+      font-size: 11px;
+      padding: 16px 8px 6px
+    }
+    .flash {
+      max-width: 1080px;
+      margin: 18px auto 0;
+      padding: 12px 20px;
+      border-radius: 9px;
+      background: #e5f3ec;
+      color: #286650
+    }
+    .itinerary-teaser {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap
+    }
+    .itinerary-teaser p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      max-width: 480px
+    }
+    .itinerary-link {
+      display: inline-block;
+      background: var(--wine);
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+      text-decoration: none;
+      padding: 13px 20px;
+      border-radius: 10px;
+      white-space: nowrap
+    }
+    .itinerary-link:hover {
+      background: var(--wine-dark, #823246)
+    }
+    .departure-note {
+      margin: -6px 0 18px;
+      font-size: 14px;
+      color: #74414b;
+      background: #f8ebe5;
+      border-radius: 10px;
+      padding: 10px 14px
+    }
+    .itinerary-day {
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      border: 1px solid var(--line);
+      background: #fffdfa
+    }
+    .itinerary-day:last-child {
+      margin-bottom: 0
+    }
+    .itinerary-day-head {
+      background: var(--ink);
+      color: #fff;
+      padding: 13px 18px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px
+    }
+    .itinerary-day-badge {
+      font-family: Georgia,serif;
+      font-size: 21px;
+      font-weight: 700;
+      color: #f0b8a8;
+      white-space: nowrap
+    }
+    .itinerary-day-title {
+      font-size: 15px;
+      font-weight: 600
+    }
+    .itinerary-table {
+      width: 100%;
+      border-collapse: collapse
+    }
+    .itinerary-table td {
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--line);
+      font-size: 13.5px;
+      color: var(--text);
+      vertical-align: top
+    }
+    .itinerary-table tr:last-child td {
+      border-bottom: 0
+    }
+    .itinerary-table td.time-col {
+      font-weight: 700;
+      color: var(--wine);
+      white-space: nowrap;
+      width: 80px
+    }
+    .extras-note {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 13.5px
+    }
+    .panel ul.plain-list {
+      margin: 0;
+      padding-left: 20px;
+      line-height: 1.8;
+      font-size: 14px;
+      color: var(--text)
     }
     @media(max-width:720px) {
       .layout {
@@ -155,12 +309,18 @@
       }
     }
   </style>
+{% include "_ui_head.html" %}
 </head>
 <body>
   <header class="nav">
     <a class="brand" href="{{ url_for('dashboard') }}">GoGather</a>
     <a class="back" href="{{ url_for('packages') }}">← All packages</a>
   </header>
+  {% with messages=get_flashed_messages(with_categories=true) %}
+    {% for c,m in messages %}
+      <div class="flash">{{ m }}</div>
+    {% endfor %}
+  {% endwith %}
   <main class="wrap">
     <section class="hero">
       <div class="tag">{{ package.tag }}</div>
@@ -169,6 +329,69 @@
     </section>
     <div class="layout">
       <div>
+        {% if photos %}
+        <section class="panel">
+          <h2>Photo gallery</h2>
+          <div class="gallery-grid">
+            {% for photo in photos %}
+              <div class="gallery-item">
+                <img src="{{ url_for('static', filename=photo.image) }}" alt="{{ photo.caption or package.name }}">
+                {% if photo.caption %}<span>{{ photo.caption }}</span>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+        <section class="panel">
+          <h2>Day-by-day itinerary</h2>
+          {% if departure_time or departure_point %}
+            <div class="departure-note">
+              <strong>Departure:</strong>
+              {% if departure_time %}{{ departure_time }}{% endif %}{% if departure_time and departure_point %} from {% endif %}{% if departure_point %}{{ departure_point }}{% endif %}
+            </div>
+          {% endif %}
+          {% for day in itinerary %}
+            <div class="itinerary-day">
+              <div class="itinerary-day-head">
+                <span class="itinerary-day-badge">Day {{ day.day_number }}</span>
+                <span class="itinerary-day-title">{{ day.title }}</span>
+              </div>
+              <table class="itinerary-table">
+                <tbody>
+                  {% for step in day.activities %}
+                    <tr><td class="time-col">{{ step.time }}</td><td>{{ step.activity }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <p>The day-by-day plan for this package hasn't been added yet.</p>
+          {% endfor %}
+        </section>
+
+        {% if extra_expenses %}
+        <section class="panel">
+          <h2>Optional activities &amp; extra expenses</h2>
+          <p class="extras-note">Not included in the package price -- pay locally if you'd like to add these on.</p>
+          <ul class="plain-list">
+            {% for item in extra_expenses %}<li>{{ item }}</li>{% endfor %}
+          </ul>
+        </section>
+        {% endif %}
+
+        <section class="panel">
+          <h2>What to pack</h2>
+          <ul class="plain-list">
+            {% for item in packing_list %}<li>{{ item }}</li>{% endfor %}
+          </ul>
+        </section>
+
+        <section class="panel">
+          <h2>Things to know before you go</h2>
+          <ul class="plain-list">
+            {% for item in things_to_know %}<li>{{ item }}</li>{% endfor %}
+          </ul>
+        </section>
         <section class="panel">
           <h2>Places covered</h2>
           <div class="list">
@@ -186,6 +409,24 @@
           <div class="list">
             {% for item in package.includes %}<span class="pill">{{ item }}</span>{% endfor %}
           </div>
+        </section>
+        <section class="panel">
+          <h2>Traveller reviews{% if rating_avg %} &middot; {{ rating_avg }} / 5 ({{ reviews|length }}){% endif %}</h2>
+          {% if reviews %}
+            <div class="review-list">
+              {% for review in reviews %}
+                <div class="review-item">
+                  <div class="review-item-head">
+                    <strong>{{ '★' * review.rating }}{{ '☆' * (5 - review.rating) }}</strong>
+                    <span>{{ review.full_name }} &middot; {{ review.created_at.strftime('%d %b %Y') }}</span>
+                  </div>
+                  {% if review.comment %}<p>{{ review.comment }}</p>{% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p>No reviews yet -- be the first traveller to complete this trip and leave one.</p>
+          {% endif %}
         </section>
       </div>
       <aside class="panel">
@@ -206,10 +447,16 @@
           <h3>Starting price</h3>
           <div class="price">{{ package.price|npr }} <small>per traveller</small></div>
         </div>
+        {% if package.max_seats %}<p class="note">Limited to {{ package.max_seats }} seats per departure date.</p>{% endif %}
         <a class="book" href="{{ url_for('book_package', package_id=package.id) }}">Book this package</a>
+        <form method="post" action="{{ url_for('toggle_wishlist', package_id=package.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <button class="wish-btn {{ 'saved' if package.id in wishlisted_ids else '' }}" type="submit" data-keep-label data-saved-label="♥ Saved to wishlist" data-unsaved-label="♡ Save to wishlist">{{ '♥ Saved to wishlist' if package.id in wishlisted_ids else '♡ Save to wishlist' }}</button>
+        </form>
         <p class="note">Booking confirmation and payment will be added in the next step.</p>
       </aside>
     </div>
   </main>
+{% include "_ui_foot.html" %}
 </body>
 </html>

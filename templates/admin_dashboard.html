@@ -32,6 +32,7 @@
 
   /* header */
   .welcome { margin-bottom: 35px; }
+  .welcome-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
   .welcome h1 { font-family: var(--font-display); color: var(--charcoal); font-size: 2.3rem; margin: 0 0 8px; }
   .welcome p { color: var(--text-muted); margin: 0; font-size: 1rem; }
   .admin-badge {
@@ -44,6 +45,36 @@
     font-size: 0.82rem;
     font-weight: 700;
   }
+
+  /* revenue toggle */
+  .revenue-box {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 20px;
+    box-shadow: 0 5px 18px rgba(80, 50, 40, 0.05);
+    min-width: 220px;
+  }
+  .revenue-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 8px; }
+  .revenue-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .revenue-amount { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; color: var(--charcoal); letter-spacing: 0.02em; }
+  .eye-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--primary-light);
+    background: var(--primary-light);
+    color: var(--primary-dark);
+    border-radius: 999px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .eye-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
+  .eye-btn svg { width: 18px; height: 18px; }
+  .revenue-fee-note { margin-top: 8px; font-size: 0.72rem; color: var(--text-muted); }
+  .revenue-fee-note a { color: var(--primary-dark); font-weight: 600; }
   .mix {
   background: white;
     border: 1px solid var(--border);
@@ -174,6 +205,7 @@
 </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
 </head>
 <body>
 <div class="app-shell">
@@ -185,10 +217,30 @@
 <main class="container">
 
   <section class="welcome">
-    <h1>Welcome, {{ username }}</h1>
-    <p>Manage GoGather's travellers, destinations,
-      packages and bookings from one place.</p>
-    <span class="admin-badge">ADMINISTRATOR</span>
+    <div class="welcome-top">
+      <div>
+        <h1>Welcome, {{ username }}</h1>
+        <p>Manage GoGather's travellers, destinations,
+          packages and bookings from one place.</p>
+        <span class="admin-badge">ADMINISTRATOR</span>
+      </div>
+      <div class="revenue-box">
+        <div class="revenue-label">Total Profit</div>
+        <div class="revenue-row">
+          <span class="revenue-amount" id="revenueAmount" data-value="{{ total_revenue|npr }}">••••••</span>
+          <button type="button" class="eye-btn" id="revenueToggle" aria-pressed="false" aria-label="Show total revenue">
+            <svg id="eyeOpenIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg id="eyeClosedIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M3 3l18 18"/><path d="M10.6 10.6a3 3 0 0 0 4.24 4.24"/><path d="M9.9 4.24A11 11 0 0 1 12 4c7 0 11 8 11 8a17.7 17.7 0 0 1-3.22 4.36"/><path d="M6.1 6.1A17.7 17.7 0 0 0 1 12s4 8 11 8a11 11 0 0 0 4.24-.84"/></svg>
+          </button>
+        </div>
+        <div class="revenue-fee-note">
+          {{ margin_percent }}% margin on {{ gross_booking_value|npr }} in gross bookings (incl. {{ total_service_fees|npr }} in service fees) &mdash;
+          <a href="{{ url_for('admin_package_margins') }}">see source</a>,
+          plus {{ total_cancellation_fees|npr }} kept from cancellation fees &mdash;
+          <a href="{{ url_for('admin_cancellation_fees') }}">see source</a>
+        </div>
+      </div>
+    </div>
   </section>
 <div class="mix">
   <h2>Overview</h2>
@@ -305,5 +357,27 @@
   </div>
 </div>
 <script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+<script>
+  document.getElementById('revenueToggle').addEventListener('click', function () {
+    var amountEl = document.getElementById('revenueAmount');
+    var eyeOpen = document.getElementById('eyeOpenIcon');
+    var eyeClosed = document.getElementById('eyeClosedIcon');
+    var isHidden = amountEl.textContent.indexOf('•') !== -1;
+    if (isHidden) {
+      amountEl.textContent = amountEl.dataset.value;
+      eyeOpen.hidden = true;
+      eyeClosed.hidden = false;
+      this.setAttribute('aria-pressed', 'true');
+      this.setAttribute('aria-label', 'Hide total revenue');
+    } else {
+      amountEl.textContent = '••••••';
+      eyeOpen.hidden = false;
+      eyeClosed.hidden = true;
+      this.setAttribute('aria-pressed', 'false');
+      this.setAttribute('aria-label', 'Show total revenue');
+    }
+  });
+</script>
+{% include "_ui_foot.html" %}
 </body>
 </html>

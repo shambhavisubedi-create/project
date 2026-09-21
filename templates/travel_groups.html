@@ -31,12 +31,6 @@
       margin: auto;
       padding: 38px 24px 70px
     }
-    .hero {
-      background: linear-gradient(120deg,#f8dad6,#f7e7d8);
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      padding: 38px
-    }
     .eyebrow {
       color: var(--wine);
       text-transform: uppercase;
@@ -49,14 +43,13 @@
       color: var(--ink)
     }
     h1 {
-      font-size: clamp(34px,5vw,54px);
-      margin: 9px 0
+      font-size: clamp(28px,4vw,40px);
+      margin: 6px 0 6px
     }
-    .hero p {
-      max-width: 640px;
+    .intro {
+      max-width: 560px;
       color: var(--muted);
-      line-height: 1.65;
-      margin: 0
+      margin: 0 0 22px
     }
     .flash {
       padding: 13px 16px;
@@ -239,6 +232,23 @@
       font-size: 14px;
       font-weight: 700
     }
+    .chat-link {
+      display: block;
+      text-align: center;
+      text-decoration: none;
+      margin-top: 10px;
+      background: #fff;
+      border: 1px solid var(--wine);
+      color: var(--wine);
+      border-radius: 9px;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 11px
+    }
+    .chat-link:hover {
+      background: var(--wine);
+      color: #fff
+    }
     .full-group {
       background: #eee8e4;
       color: #736660;
@@ -256,6 +266,32 @@
       text-align: center;
       color: var(--muted)
     }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin: 28px 0 4px
+    }
+    .tab-btn {
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 10px 20px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer
+    }
+    .tab-btn.active {
+      background: var(--wine);
+      border-color: var(--wine);
+      color: #fff
+    }
+    .tab-panel {
+      display: none
+    }
+    .tab-panel.active {
+      display: block
+    }
     @media(max-width:800px) {
       .tools,.grid {
         grid-template-columns: 1fr
@@ -270,13 +306,11 @@
         width: 100%;
         min-height: 44px
       }
-      .hero {
-        padding: 28px
-      }
     }
   </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
 </head>
 <body>
 <div class="app-shell">
@@ -286,118 +320,176 @@
   {% include "_topbar.html" %}
 
   <main class="wrap">
-    <section class="hero">
-      <div class="eyebrow">Travel together</div>
-      <h1>Find your people, plan the journey.</h1>
-      <p>Join travellers headed to the same destination, or create a group and set the pace, date, budget, and group size for your trip.</p>
-    </section>
+    <div class="eyebrow">Travel together</div>
+    <h1>Travel Groups</h1>
+    <p class="intro">Join travellers headed to the same destination, or create your own group.</p>
     {% with messages=get_flashed_messages(with_categories=true) %}
       {% for category,message in messages %}
         <div class="flash {{ category }}">{{ message }}</div>
       {% endfor %}
     {% endwith %}
-    <section class="tools">
-      <div class="search">
-        <h2>Find a group</h2>
-        <p>Search by destination or group name.</p>
-        <form method="get">
-          <input name="destination" value="{{ destination }}" placeholder="e.g. Pokhara or Everest">
-          <button type="submit">Search</button>
-        </form>
-        {% if destination %}<p style="margin-top:14px"><a class="clear" href="{{ url_for('travel_groups') }}">Clear search</a></p>{% endif %}
-      </div>
-      <div class="create">
-        <h2>Create a group</h2>
-        <p>You will become the first member and group organiser.</p>
-        <form method="post" action="{{ url_for('create_travel_group') }}">
-          <div class="form-grid">
-            <div>
-              <label>Group name</label>
-              <input name="name" required placeholder="Pokhara Weekend Crew">
-            </div>
-            <div>
-              <label>Destination</label>
-              <input name="destination" required placeholder="Pokhara">
-            </div>
-            <div>
-              <label>Travel date</label>
-              <input type="date" name="travel_date" min="{{ today }}" max="{{ max_travel_date }}" required>
-            </div>
-            <div>
-              <label>Maximum members</label>
-              <input type="number" min="2" max="30" name="max_members" value="6" required>
-            </div>
-            <div class="full">
-              <label>Budget range</label>
-              <select name="budget_range">
-                <option value="">Choose a budget (optional)</option>
-                <option>Under Rs 15,000</option>
-                <option>Rs 15,000 – 35,000</option>
-                <option>Rs 35,000 – 70,000</option>
-                <option>Above Rs 70,000</option>
-              </select>
-            </div>
-            <div class="full">
-              <label>Group description</label>
-              <textarea name="description" placeholder="Tell travellers about the trip style, interests, or plan."></textarea>
-            </div>
-            <div class="full">
-              <button type="submit">Create travel group</button>
-            </div>
+
+    {# Renders one group card. Called for both the "Available" and "My groups" tabs below. #}
+    {% macro group_card(group) %}
+      <article class="card">
+        <div class="top">
+          <div>
+            <div class="destination">{{ group.destination }}</div>
+            <h2>{{ group.name }}</h2>
           </div>
-        </form>
-      </div>
-    </section>
-    <div class="bar">
-      <p>{{ groups|length }} upcoming group{{ '' if groups|length==1 else 's' }}</p>
-    </div>
-    <section class="grid">
-      {% for group in groups %}
-        <article class="card">
-          <div class="top">
-            <div>
-              <div class="destination">{{ group.destination }}</div>
-              <h2>{{ group.name }}</h2>
-            </div>
-            <div class="date">{{ group.travel_date.strftime('%d %b %Y') }}</div>
-          </div>
-          {% if group.description %}
-            <p class="description">{{ group.description }}</p>
-          {% else %}
-            <p class="description">A shared trip for travellers who want to explore {{ group.destination }} together.</p>
-          {% endif %}
-          <div class="facts">
-            <span>{{ group.member_count }} / {{ group.max_members }} members</span>
-            {% if group.budget_range %}<span>{{ group.budget_range }}</span>{% endif %}
-          </div>
-          <p class="creator">Created by {{ group.created_by }}</p>
-          {% if group.status == 'Pending' %}
-            <div class="full-group">Awaiting admin approval</div>
-          {% elif group.status == 'Rejected' %}
-            <div class="full-group">Not approved by admin</div>
-          {% elif group.has_joined %}
-            <div class="joined">✓ You are in this group</div>
-          {% elif group.has_requested %}
-            <div class="full-group">Your request to join is awaiting admin approval</div>
-          {% elif group.member_count >= group.max_members %}
-            <div class="full-group">This group is full</div>
-          {% else %}
-            <form method="post" action="{{ url_for('join_travel_group',group_id=group.id) }}">
-              <button class="join" type="submit">Join this group</button>
-            </form>
-          {% endif %}
-        </article>
-      {% else %}
-        <div class="empty">
-          <h2>No upcoming groups yet.</h2>
-          <p>Create the first one and invite fellow travellers to join.</p>
+          <div class="date">{{ group.travel_date.strftime('%d %b %Y') }}</div>
         </div>
-      {% endfor %}
+        {% if group.description %}
+          <p class="description">{{ group.description }}</p>
+        {% else %}
+          <p class="description">A shared trip for travellers who want to explore {{ group.destination }} together.</p>
+        {% endif %}
+        <div class="facts">
+          <span>{{ group.member_count }} / {{ group.max_members }} members</span>
+          {% if group.budget_range %}<span>{{ group.budget_range }}</span>{% endif %}
+        </div>
+        <p class="creator">Created by {{ group.created_by }}</p>
+        {% if group.status == 'Pending' %}
+          <div class="full-group">Awaiting admin approval</div>
+        {% elif group.status == 'Rejected' %}
+          <div class="full-group">Not approved by admin</div>
+        {% elif group.has_joined %}
+          <div class="joined">✓ You are in this group</div>
+          <a class="chat-link" href="{{ url_for('group_chat', group_id=group.id) }}">Open group chat</a>
+        {% elif group.has_requested %}
+          <div class="full-group">Your request to join is awaiting admin approval</div>
+        {% elif group.member_count >= group.max_members %}
+          <div class="full-group">This group is full</div>
+        {% else %}
+          <form method="post" action="{{ url_for('join_travel_group',group_id=group.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="join" type="submit">Join this group</button>
+          </form>
+        {% endif %}
+      </article>
+    {% endmacro %}
+
+    {# Tab buttons: "Available" is the default open tab, so it's what a traveller sees first. #}
+    <div class="tabs">
+      <button type="button" class="tab-btn active" data-tab="available">
+        Available to join ({{ available_groups|length }})
+      </button>
+      <button type="button" class="tab-btn" data-tab="mine">
+        My groups ({{ my_groups|length }})
+      </button>
+    </div>
+
+    <div class="bar">
+      <p id="tab-count">{{ available_groups|length }} available group{{ '' if available_groups|length==1 else 's' }}</p>
+    </div>
+
+    <section id="panel-available" class="tab-panel active">
+      <div class="grid">
+        {% for group in available_groups %}
+          {{ group_card(group) }}
+        {% else %}
+          <div class="empty">
+            <h2>No groups available right now.</h2>
+            <p>Search for a destination below, or create the first group.</p>
+          </div>
+        {% endfor %}
+      </div>
+
+      {# Search/create only make sense while browsing for a group to join,
+         so this lives inside the "Available" panel and is hidden on "My groups". #}
+      <section class="tools">
+        <div class="search">
+          <h2>Find a group</h2>
+          <p>Search by destination or group name.</p>
+          <form method="get">
+            <input name="destination" value="{{ destination }}" placeholder="e.g. Pokhara or Everest">
+            <button type="submit">Search</button>
+          </form>
+          {% if destination %}<p style="margin-top:14px"><a class="clear" href="{{ url_for('travel_groups') }}">Clear search</a></p>{% endif %}
+        </div>
+        <div class="create">
+          <h2>Create a group</h2>
+          <p>You will become the first member and group organiser.</p>
+          <form method="post" action="{{ url_for('create_travel_group') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-grid">
+              <div>
+                <label>Group name</label>
+                <input name="name" required placeholder="Pokhara Weekend Crew">
+              </div>
+              <div>
+                <label>Destination</label>
+                <input name="destination" required placeholder="Pokhara">
+              </div>
+              <div>
+                <label>Travel date</label>
+                <input type="date" name="travel_date" min="{{ today }}" max="{{ max_travel_date }}" required>
+              </div>
+              <div>
+                <label>Maximum members</label>
+                <input type="number" min="2" max="30" name="max_members" value="6" required>
+              </div>
+              <div class="full">
+                <label>Budget range</label>
+                <select name="budget_range">
+                  <option value="">Choose a budget (optional)</option>
+                  <option>Under Rs 15,000</option>
+                  <option>Rs 15,000 – 35,000</option>
+                  <option>Rs 35,000 – 70,000</option>
+                  <option>Above Rs 70,000</option>
+                </select>
+              </div>
+              <div class="full">
+                <label>Group description</label>
+                <textarea name="description" placeholder="Tell travellers about the trip style, interests, or plan."></textarea>
+              </div>
+              <div class="full">
+                <button type="submit">Create travel group</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+    </section>
+
+    <section id="panel-mine" class="tab-panel">
+      <div class="grid">
+        {% for group in my_groups %}
+          {{ group_card(group) }}
+        {% else %}
+          <div class="empty">
+            <h2>You haven't joined a group yet.</h2>
+            <p>Browse "Available to join" above, or create your own.</p>
+          </div>
+        {% endfor %}
+      </div>
     </section>
   </main>
 
   </div>
 </div>
 <script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+<script>
+  // Switches between the "Available to join" and "My groups" tabs.
+  // Group counts/labels are baked in server-side; this only toggles visibility.
+  document.querySelectorAll(".tab-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var tab = btn.dataset.tab;
+
+      document.querySelectorAll(".tab-btn").forEach(function (b) {
+        b.classList.toggle("active", b === btn);
+      });
+
+      document.getElementById("panel-available").classList.toggle("active", tab === "available");
+      document.getElementById("panel-mine").classList.toggle("active", tab === "mine");
+
+      var count = tab === "available"
+        ? {{ available_groups|length }}
+        : {{ my_groups|length }};
+      var label = tab === "available" ? "available group" : "group";
+      document.getElementById("tab-count").textContent =
+        count + " " + label + (count === 1 ? "" : "s");
+    });
+  });
+</script>
+{% include "_ui_foot.html" %}
 </body>
 </html>

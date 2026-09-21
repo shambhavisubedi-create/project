@@ -87,12 +87,14 @@
 
   hr.sep { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   .error-box { background: #fbe7e3; border: 1px solid #e6b6ab; color: #8a3549; padding: 10px 14px; border-radius: 10px; font-size: 0.85rem; margin-bottom: 16px; }
+  .flash { background: #e5f3ec; border: 1px solid #bfe0cf; color: #286650; padding: 10px 14px; border-radius: 10px; font-size: 0.85rem; margin-bottom: 16px; }
 
   @media (max-width: 860px) {
     .illustration-panel { padding: 32px 24px 24px; }
     .illustration-panel img { max-width: 220px; }
   }
 </style>
+{% include "_ui_head.html" %}
 </head>
 <body>
 
@@ -125,7 +127,13 @@
         <div class="error-box">{{ error }}</div>
         {% endif %}
 
-        <form method="POST" action="/login">
+        {% with messages=get_flashed_messages(with_categories=true) %}
+          {% for c,m in messages %}
+            <div class="{{ 'error-box' if c=='error' else 'flash' }}">{{ m }}</div>
+          {% endfor %}
+        {% endwith %}
+
+        <form method="POST" action="/login"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="form-group">
             <label for="username">Username or Email</label>
             <input type="text" id="username" name="username" placeholder="Enter your username or email" autocomplete="username" required autofocus>
@@ -134,14 +142,17 @@
             <label for="password">Password</label>
             <input type="password" id="password" name="password" required>
           </div>
+          <p class="subtitle" style="margin:-6px 0 16px; text-align:right"><a href="{{ url_for('forgot_password') }}">Forgot password?</a></p>
           <button type="submit" class="btn">Login</button>
         </form>
 
         <hr class="sep">
         <p class="subtitle">New traveller? <a href="/register">Register an account</a></p>
+        <p class="subtitle" style="font-size:0.78rem;"><a href="{{ url_for('privacy') }}" target="_blank">Privacy Policy</a></p>
       </div>
     </div>
   </div>
 
+{% include "_ui_foot.html" %}
 </body>
 </html>

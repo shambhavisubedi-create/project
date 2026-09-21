@@ -14,8 +14,7 @@ bookings, groups, and group-join requests, and manage packages/destinations/trav
 |---|---|
 | Backend language | **Python** (Flask web framework) |
 | Frontend | **HTML** (Jinja2 templates) + inline **CSS** (mostly embedded per-page, some external `.css` files) + a little inline **JavaScript** (Highcharts config on the reports page) |
-| Primary database | **MySQL** (via `mysql-connector-python`, connection pooling) — users, bookings, packages, travel_groups, group_members |
-| Secondary database | **SQLite** (via Python's built-in `sqlite3`) — used *only* for the destinations/places catalogue (`instance/places.sqlite3`) |
+| Primary database | **MySQL** (via `mysql-connector-python`, connection pooling) — users, bookings, packages, travel_groups, group_members, and the destinations catalogue (`explore_places`) |
 | Charting | **Highcharts** (loaded from CDN, used on the admin Reports page) |
 | Config | `.env` file read via `python-dotenv` (DB host/user/password/name) |
 | Testing | Python's built-in `unittest`, with `unittest.mock.patch` to stub out the database |
@@ -32,7 +31,7 @@ was found in the repo — dependencies are installed ad hoc).
 |---|---|---|
 | `app.py` | 1463 | The entire Flask app: every route, all business logic, in-code data constants |
 | `db.py` | 61 | MySQL connection pooling + tiny `query()` / `execute()` helpers used everywhere |
-| `place_store.py` | 55 | SQLite-backed CRUD for the destinations catalogue (separate from MySQL) |
+| `place_store.py` | 55 | MySQL-backed CRUD for the destinations catalogue (`explore_places` table) |
 
 ### Python — tests (3 files)
 | File | Lines | Purpose |
@@ -53,7 +52,7 @@ was found in the repo — dependencies are installed ad hoc).
 | `package_detail.html` | 215 | Single package detail + itinerary blurb |
 | `book_package.html` | 207 | Booking form |
 | `my_bookings.html` | 254 | Traveller's own bookings list + cancel |
-| `explore_places.html` | 369 | Browse destinations (SQLite-backed) |
+| `explore_places.html` | 369 | Browse destinations (MySQL-backed) |
 | `place_detail.html` | 226 | Single destination detail |
 | `travel_groups.html` | 437 | Create/search/join travel groups |
 | `profile.html` | 115 | Traveller's own profile |
@@ -73,23 +72,28 @@ was found in the repo — dependencies are installed ad hoc).
 |---|---|
 | `.env` | DB connection settings (host, port, user, db name — password left blank/local) |
 | `.gitignore` | Excludes `__pycache__`, `.env`, etc. from git |
-| `instance/places.sqlite3` | The live SQLite database file for destinations (auto-created on first run) |
 
-## 4. How data is stored — two separate databases
+## 4. How data is stored — one MySQL database
 
-This is the single most important thing to understand about this codebase:
+Everything lives in MySQL (`gogather` database), accessed through `db.py`'s
+`query()`/`execute()` helpers:
 
-- **MySQL** (`gogather` database) holds everything "core": `users`, `packages`,
-  `bookings`, `travel_groups`, `group_members`. Accessed through `db.py`'s
-  `query()`/`execute()` helpers everywhere in `app.py`.
-- **SQLite** (`instance/places.sqlite3`) holds only the destinations catalogue.
-  It's seeded once from the hardcoded `PLACES` list in `app.py` (lines ~59–70),
-  then becomes the actual source of truth — edits via "Manage Places" change the
-  SQLite file, not the Python list.
-- `FEATURED_PACKAGES` (top of `app.py`) and `PACKAGE_DETAILS` are **hardcoded
-  Python dicts**, not database-backed. `FEATURED_PACKAGES` is decorative sample
-  data shown on the traveller dashboard; `PACKAGE_DETAILS` supplies extra
-  itinerary text merged onto real MySQL package rows on the detail page.
+- `users`, `packages`, `bookings`, `travel_groups`, `group_members` — the core
+  tables.
+- `explore_places` (plus a one-row `explore_places_seeded` marker) holds the
+  destinations catalogue, managed by `place_store.py`. It used to live in a
+  SQLite file (`instance/places.sqlite3`); that file is only read once, on the
+  first request after upgrading, to import any admin edits before the table
+  moves to MySQL for good. (Note: there's also an older, unrelated `places`
+  table with an `icon` column, left over from an earlier experiment and not
+  read by any current route — don't confuse the two.)
+- `packages.is_featured` flags which packages show on the traveller dashboard,
+  and `packages.tag` / `summary` / `places_covered` / `activities` / `includes`
+  hold the itinerary details shown on the packages list and detail pages, all
+  editable from Manage Packages. These columns (and the `is_featured`/tag/etc.
+  values for the packages that already existed) are added automatically the
+  first time the app runs against a database that doesn't have them yet — see
+  `ensure_package_columns()`/`backfill_package_details()` in `app.py`.
 
 ## 5. Roles & access control
 
@@ -109,7 +113,8 @@ decorator/middleware for this — it's repeated inline in each view function.
 
 ### Traveller: Packages & Booking
 1. `/packages` — search/filter real packages from MySQL.
-2. `/packages/<id>` — detail view, itinerary blurb merged in from `PACKAGE_DETAILS`.
+2. `/packages/<id>` — detail view, itinerary blurb read from the package's own
+   `tag`/`summary`/`places_covered`/`activities`/`includes` columns.
 3. `/book_package` — submit a booking; phone number is always pulled from the
    traveller's own account server-side (not trusted from the form, to prevent
    phone spoofing — see commit history).
@@ -118,7 +123,7 @@ decorator/middleware for this — it's repeated inline in each view function.
    needs admin sign-off.
 
 ### Traveller: Destinations
-`/explore_places` (SQLite-backed list) → `/explore_places/<slug>` (detail).
+`/explore_places` (MySQL-backed list) → `/explore_places/<slug>` (detail).
 
 ### Traveller: Travel Groups
 1. `/travel_groups` — browse/search groups; only `Confirmed` groups (plus your
@@ -137,7 +142,7 @@ decorator/middleware for this — it's repeated inline in each view function.
 
 ### Admin
 - `/admin-dashboard` — overview stats.
-- `/admin/places` (`manage_places.html`) — CRUD on the SQLite destinations store.
+- `/admin/places` (`manage_places.html`) — CRUD on the MySQL destinations store.
 - `/admin/packages` — CRUD on MySQL `packages`.
 - `/admin/bookings` — search/filter/approve/decline bookings and cancellation
   requests.
@@ -149,17 +154,20 @@ decorator/middleware for this — it's repeated inline in each view function.
 
 ## 7. Notable patterns worth knowing
 
-- **Runtime schema migration**: `ensure_group_columns()` in `app.py` runs at
-  startup (only inside `if __name__ == "__main__":`) and does `DESCRIBE` +
-  `ALTER TABLE ... ADD COLUMN` if a column is missing — there's no formal
-  migrations folder or tool; schema changes are applied this way, by hand, once.
-  ⚠️ This block only executes when the app is launched via `python app.py`
-  directly — if it's ever run another way (e.g. `flask run`), new columns won't
-  get added automatically.
+- **Runtime schema migration**: `ensure_group_columns()`, `ensure_payment_columns()`,
+  `ensure_user_columns()` and `ensure_package_columns()` in `app.py` do `DESCRIBE`
+  + `ALTER TABLE ... ADD COLUMN` if a column is missing — there's no formal
+  migrations folder or tool; schema changes are applied this way instead. They
+  run both inside `if __name__ == "__main__":` (for `python app.py`) and from
+  the `prepare_notifications()` `before_request` hook, gated by the
+  `NOTIFICATIONS_READY` app.config flag, so they also run under `flask run` —
+  on whichever request first has a logged-in user after the process starts.
+  `ensure_package_columns()` additionally backfills the itinerary details for
+  packages that already existed, the first time it adds the columns.
+  `place_store.py`'s `_ensure_table()` follows the same idea for `explore_places`,
+  using a one-row marker table (`explore_places_seeded`) instead of a column
+  check, so deleting every destination doesn't cause them to reappear.
 - **Approval-gate pattern repeats three times**: bookings (Pending → Confirmed/
   Cancel Requested/Cancelled), travel groups (Pending → Confirmed/Rejected),
   and now group membership (Pending → Confirmed/Rejected) — all admin-gated to
   prevent unreviewed content/fraud from going live.
-- **Two independent "id-less" data sources** feed into pages that otherwise look
-  DB-backed: `FEATURED_PACKAGES` (dashboard teaser) and the original `PLACES`
-  seed list — worth remembering these don't reflect live edits.

@@ -88,11 +88,16 @@
   hr.sep { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   .error-box { background: #fbe7e3; border: 1px solid #e6b6ab; color: #8a3549; padding: 10px 14px; border-radius: 10px; font-size: 0.85rem; margin-bottom: 16px; }
 
+  .terms-check { display: flex !important; align-items: flex-start; gap: 9px; font-weight: 400 !important; font-size: 0.82rem; color: var(--text-muted); margin: -4px 0 18px; cursor: pointer; }
+  .terms-check input[type="checkbox"] { width: auto; margin: 3px 0 0; flex-shrink: 0; }
+  .terms-check a { color: var(--primary-dark, #8a3549); font-weight: 600; }
+
   @media (max-width: 860px) {
     .illustration-panel { padding: 32px 24px 24px; }
     .illustration-panel img { max-width: 220px; }
   }
 </style>
+{% include "_ui_head.html" %}
 </head>
 <body>
 
@@ -125,7 +130,7 @@
         <div class="error-box">{{ error }}</div>
         {% endif %}
 
-        <form method="POST" action="/register">
+        <form method="POST" action="/register"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="form-group">
             <label for="full_name">Full Name</label>
             <input type="text" id="full_name" name="full_name" required>
@@ -168,6 +173,10 @@
             <label for="confirm_password">Confirm Password</label>
             <input type="password" id="confirm_password" name="confirm_password" required>
           </div>
+          <label class="terms-check">
+            <input type="checkbox" id="accept_terms" name="accept_terms" required>
+            <span>I accept the <a href="{{ url_for('terms') }}" target="_blank">Terms &amp; Conditions</a>, including the <a href="{{ url_for('terms') }}#refund" target="_blank">Refund Policy</a>, and the <a href="{{ url_for('privacy') }}" target="_blank">Privacy Policy</a>.</span>
+          </label>
           <button type="submit" class="btn">Register</button>
         </form>
 
@@ -177,5 +186,6 @@
     </div>
   </div>
 
+{% include "_ui_foot.html" %}
 </body>
 </html>

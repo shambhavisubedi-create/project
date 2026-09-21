@@ -65,9 +65,27 @@
   .edit-form { margin-top: 12px; padding: 14px; background: var(--bg); border-radius: 10px; }
 
   .empty { text-align: center; color: var(--text-muted); padding: 30px; }
+
+  .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; width: 100%; }
+  .photo-thumb { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 8px; text-align: center; }
+  .photo-thumb img { width: 100%; height: 80px; object-fit: cover; border-radius: 8px; }
+  .photo-caption { display: block; font-size: 0.72rem; color: var(--text-muted); margin: 6px 0 4px; }
+  .photo-thumb .btn-danger { padding: 5px 10px; font-size: 0.72rem; margin-top: 4px; }
+
+  .itinerary-day { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+  .itinerary-day-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .itinerary-day-head .btn-danger { padding: 5px 10px; font-size: 0.72rem; }
+  .itinerary-activity-list { list-style: none; margin: 0 0 10px; padding: 0; }
+  .itinerary-activity-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 0.85rem; }
+  .itinerary-activity-list li .btn-danger { padding: 2px 8px; font-size: 0.8rem; line-height: 1; }
+
+  .pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 18px 0; font-size: 0.85rem; color: var(--text-muted); }
+  .pagination a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+  .pagination a:hover { text-decoration: underline; }
 </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
 </head>
 <body>
 <div class="app-shell">
@@ -89,7 +107,7 @@
 
   <section class="card">
     <h2>Add a package</h2>
-    <form method="POST" action="{{ url_for('admin_packages') }}">
+    <form method="POST" action="{{ url_for('admin_packages') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="form-grid">
         <div class="full">
           <label for="name">Package name</label>
@@ -102,6 +120,7 @@
         <div>
           <label for="price">Price (NPR)</label>
           <input type="number" id="price" name="price" min="2000" max="500000" step="1" required>
+          <small>GoGather keeps a {{ default_margin_percent|round|int }}% margin automatically -- no supplier cost entry needed.</small>
         </div>
         <div>
           <label for="hotel_type">Accommodation</label>
@@ -121,6 +140,33 @@
             {% endfor %}
           </select>
         </div>
+        <div>
+          <label for="max_seats">Seats per departure date (optional)</label>
+          <input type="number" id="max_seats" name="max_seats" min="1" placeholder="Leave blank for unlimited">
+        </div>
+        <div class="full">
+          <label for="tag">Tag</label>
+          <input type="text" id="tag" name="tag" placeholder="e.g. Culture & lakes">
+        </div>
+        <div class="full">
+          <label for="summary">Summary</label>
+          <input type="text" id="summary" name="summary" placeholder="A short description shown on the package card">
+        </div>
+        <div class="full">
+          <label for="places_covered">Places covered (comma separated)</label>
+          <input type="text" id="places_covered" name="places_covered" placeholder="Kathmandu, Patan, Pokhara">
+        </div>
+        <div class="full">
+          <label for="activities">Activities (comma separated)</label>
+          <input type="text" id="activities" name="activities" placeholder="Heritage walk, Lakeside boating">
+        </div>
+        <div class="full">
+          <label for="includes">Includes (comma separated)</label>
+          <input type="text" id="includes" name="includes" placeholder="Hotel stay, Private transfers, Daily breakfast">
+        </div>
+        <div class="full">
+          <label><input type="checkbox" name="is_featured" style="width:auto;display:inline;vertical-align:middle;margin-right:6px;">Show on traveller dashboard as a featured package</label>
+        </div>
         <div class="full">
           <button type="submit" class="btn">Add package</button>
         </div>
@@ -132,15 +178,16 @@
     <h2>Current packages ({{ packages|length }})</h2>
 
     {% for package in packages %}
-      <div class="package-row">
+      <div class="package-row" id="package-{{ package.id }}">
         <div class="package-top">
           <div>
-            <div class="package-name">{{ package.name }}</div>
-            <div class="package-meta">{{ package.duration_days }} days &middot; {{ package.hotel_type|capitalize }} &middot; {{ package.transport_mode|capitalize }}</div>
+            <div class="package-name">{{ package.name }}{% if package.is_featured %} <span style="color:var(--primary-dark);font-size:0.75rem;font-weight:700;">&middot; Featured</span>{% endif %}</div>
+            <div class="package-meta">{{ package.duration_days }} days &middot; {{ package.hotel_type|capitalize }} &middot; {{ package.transport_mode|capitalize }}{% if package.max_seats %} &middot; {{ package.max_seats }} seats/date{% endif %}</div>
           </div>
           <div class="package-actions">
             <div class="package-price">{{ package.price|npr }}</div>
-            <form method="post" action="{{ url_for('delete_package', package_id=package.id) }}" onsubmit="return confirm('Remove this package?')">
+            <div class="package-meta">{{ (package.price - package.cost_price)|npr }} margin ({{ ((package.price - package.cost_price) / package.price * 100)|round|int if package.price else 0 }}%)</div>
+            <form method="post" action="{{ url_for('delete_package', package_id=package.id) }}" onsubmit="return confirm('Remove this package?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-danger">Delete</button>
             </form>
           </div>
@@ -148,7 +195,7 @@
 
         <details class="edit-panel">
           <summary>Edit details</summary>
-          <form method="post" action="{{ url_for('update_package', package_id=package.id) }}" class="edit-form">
+          <form method="post" action="{{ url_for('update_package', package_id=package.id) }}" class="edit-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-grid">
               <div class="full">
                 <label>Package name</label>
@@ -161,6 +208,7 @@
               <div>
                 <label>Price (NPR)</label>
                 <input type="number" name="price" value="{{ package.price|int }}" min="2000" max="500000" step="1" required>
+                <small>Supplier cost recalculates to {{ default_margin_percent|round|int }}% margin on save.</small>
               </div>
               <div>
                 <label>Accommodation</label>
@@ -178,11 +226,176 @@
                   {% endfor %}
                 </select>
               </div>
+              <div>
+                <label>Seats per departure date (optional)</label>
+                <input type="number" name="max_seats" value="{{ package.max_seats or '' }}" min="1" placeholder="Leave blank for unlimited">
+              </div>
+              <div class="full">
+                <label>Tag</label>
+                <input type="text" name="tag" value="{{ package.tag }}">
+              </div>
+              <div class="full">
+                <label>Summary</label>
+                <input type="text" name="summary" value="{{ package.summary }}">
+              </div>
+              <div class="full">
+                <label>Places covered (comma separated)</label>
+                <input type="text" name="places_covered" value="{{ package.places|join(', ') }}">
+              </div>
+              <div class="full">
+                <label>Activities (comma separated)</label>
+                <input type="text" name="activities" value="{{ package.activities|join(', ') }}">
+              </div>
+              <div class="full">
+                <label>Includes (comma separated)</label>
+                <input type="text" name="includes" value="{{ package.includes|join(', ') }}">
+              </div>
+              <div class="full">
+                <label><input type="checkbox" name="is_featured" {% if package.is_featured %}checked{% endif %} style="width:auto;display:inline;vertical-align:middle;margin-right:6px;">Show on traveller dashboard as a featured package</label>
+              </div>
               <div class="full">
                 <button type="submit" class="btn btn-outline">Save changes</button>
               </div>
             </div>
           </form>
+        </details>
+
+        <details class="edit-panel">
+          <summary>Photo gallery ({{ package.photos|length }})</summary>
+          <div class="edit-form">
+            {% if package.photos %}
+              <div class="photo-grid">
+                {% for photo in package.photos %}
+                  <div class="photo-thumb">
+                    <img src="{{ url_for('static', filename=photo.image) }}" alt="{{ photo.caption or package.name }}">
+                    {% if photo.caption %}<span class="photo-caption">{{ photo.caption }}</span>{% endif %}
+                    <form method="post" action="{{ url_for('delete_package_photo', package_id=package.id, photo_id=photo.id) }}" onsubmit="return confirm('Remove this photo?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-danger">Remove</button>
+                    </form>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <form method="post" action="{{ url_for('add_package_photo', package_id=package.id) }}" class="form-grid" style="margin-top:12px;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div>
+                <label>Add a photo</label>
+                <select name="image" required>
+                  <option value="">Choose an image</option>
+                  {% for item in images %}<option value="{{ item }}">{{ item }}</option>{% endfor %}
+                </select>
+              </div>
+              <div>
+                <label>Caption (optional)</label>
+                <input type="text" name="caption" maxlength="200" placeholder="e.g. Sunrise over Phewa Lake">
+              </div>
+              <div class="full">
+                <button type="submit" class="btn btn-outline">Add photo</button>
+              </div>
+            </form>
+          </div>
+        </details>
+
+        <details class="edit-panel">
+          <summary>Day-by-day itinerary ({{ package.itinerary|length }} day(s))</summary>
+          <div class="edit-form">
+            {% for day in package.itinerary %}
+              <div class="itinerary-day">
+                <div class="itinerary-day-head">
+                  <strong>Day {{ day.day_number }}: {{ day.title }}</strong>
+                  <form method="post" action="{{ url_for('delete_package_itinerary_day', package_id=package.id, day_id=day.id) }}" onsubmit="return confirm('Remove Day {{ day.day_number }} and all its activities?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">Remove day</button>
+                  </form>
+                </div>
+                {% if day.activities %}
+                  <ul class="itinerary-activity-list">
+                    {% for activity in day.activities %}
+                      <li>
+                        <span><strong>{{ activity.activity_time }}</strong> — {{ activity.activity }}</span>
+                        <form method="post" action="{{ url_for('delete_package_itinerary_activity', package_id=package.id, activity_id=activity.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                          <button type="submit" class="btn btn-danger">&times;</button>
+                        </form>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+                <form method="post" action="{{ url_for('add_package_itinerary_activity', package_id=package.id, day_id=day.id) }}" class="form-grid"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <div>
+                    <label>Time</label>
+                    <input type="text" name="activity_time" maxlength="10" placeholder="e.g. 08:00" required>
+                  </div>
+                  <div>
+                    <label>Activity</label>
+                    <input type="text" name="activity" maxlength="255" placeholder="e.g. Drive to Nagarkot viewpoint" required>
+                  </div>
+                  <div class="full">
+                    <button type="submit" class="btn btn-outline">Add activity</button>
+                  </div>
+                </form>
+              </div>
+            {% endfor %}
+
+            <form method="post" action="{{ url_for('add_package_itinerary_day', package_id=package.id) }}" class="form-grid" style="margin-top:12px;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div>
+                <label>Day number</label>
+                <input type="number" name="day_number" min="1" max="{{ package.duration_days }}" required>
+              </div>
+              <div>
+                <label>Day title</label>
+                <input type="text" name="title" maxlength="150" placeholder="e.g. Trek to Namche Bazaar" required>
+              </div>
+              <div class="full">
+                <button type="submit" class="btn btn-outline">Add day</button>
+              </div>
+            </form>
+
+            <form method="post" action="{{ url_for('update_package_itinerary_extras', package_id=package.id) }}" class="form-grid" style="margin-top:20px;border-top:1px solid var(--line, #e6ddd3);padding-top:16px;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div>
+                <label>Departure time</label>
+                <input type="text" name="departure_time" maxlength="100" value="{{ package.itinerary_extras.departure_time or '' }}" placeholder="e.g. 6:00 AM">
+              </div>
+              <div>
+                <label>Departure point</label>
+                <input type="text" name="departure_point" maxlength="200" value="{{ package.itinerary_extras.departure_point or '' }}" placeholder="e.g. Kathmandu -- Naya Bus Park">
+              </div>
+              <div class="full">
+                <label>What to pack (comma separated)</label>
+                <input type="text" name="packing_list" value="{{ package.itinerary_extras.packing_list|join(', ') }}" placeholder="Warm jacket, Trekking boots, Sunscreen">
+              </div>
+              <div class="full">
+                <label>Things to know before you go (comma separated)</label>
+                <input type="text" name="things_to_know" value="{{ package.itinerary_extras.things_to_know|join(', ') }}" placeholder="Altitude sickness precautions, Travel insurance recommended">
+              </div>
+              <div class="full">
+                <label>Optional activities & extra expenses (comma separated)</label>
+                <input type="text" name="extra_expenses" value="{{ package.itinerary_extras.extra_expenses|join(', ') }}" placeholder="Paragliding (optional) -- approx. Rs 8,000 per person">
+              </div>
+              <div class="full">
+                <button type="submit" class="btn btn-outline">Save itinerary details</button>
+              </div>
+            </form>
+          </div>
+        </details>
+
+        <details class="edit-panel">
+          <summary>Reviews ({{ package.reviews|length }})</summary>
+          <div class="edit-form">
+            {% if package.reviews %}
+              {% for review in package.reviews %}
+                <div class="itinerary-day">
+                  <div class="itinerary-day-head">
+                    <strong>{{ '★' * review.rating }}{{ '☆' * (5 - review.rating) }} &middot; {{ review.full_name }} &middot; {{ review.created_at.strftime('%d %b %Y') }}</strong>
+                    <form method="post" action="{{ url_for('delete_review', review_id=review.id) }}" onsubmit="return confirm('Remove this review?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="hidden" name="next" value="{{ url_for('admin_packages') }}#package-{{ package.id }}">
+                      <button type="submit" class="btn btn-danger">Remove</button>
+                    </form>
+                  </div>
+                  {% if review.comment %}<p style="margin:0;font-size:0.85rem;">{{ review.comment }}</p>{% endif %}
+                </div>
+              {% endfor %}
+            {% else %}
+              <p>No reviews yet for this package.</p>
+            {% endif %}
+          </div>
         </details>
       </div>
     {% else %}
@@ -190,10 +403,19 @@
     {% endfor %}
   </section>
 
+  {% if total_pages > 1 %}
+    <nav class="pagination">
+      {% if page > 1 %}<a href="{{ url_for('admin_packages', page=page-1) }}">&larr; Previous</a>{% endif %}
+      <span>Page {{ page }} of {{ total_pages }}</span>
+      {% if page < total_pages %}<a href="{{ url_for('admin_packages', page=page+1) }}">Next &rarr;</a>{% endif %}
+    </nav>
+  {% endif %}
+
 </main>
 
   </div>
 </div>
 <script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+{% include "_ui_foot.html" %}
 </body>
 </html>

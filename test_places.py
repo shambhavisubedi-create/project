@@ -1,33 +1,49 @@
-import tempfile
 import unittest
-from pathlib import Path
 
-from app import app, PLACES
-from place_store import get_places
+from app import app
+from db import execute, query
+from place_store import SEED_PLACES, get_places
 
 
 class PlacesTests(unittest.TestCase):
     def setUp(self):
-        self.directory = tempfile.TemporaryDirectory()
-        self.previous = dict(app.config)
-        app.config.update(TESTING=True, PLACES_DATABASE=str(Path(self.directory.name) / "places.db"))
+        app.config.update(TESTING=True)
         self.client = app.test_client()
         self.login(1)
         self.client.get('/admin/places')
         with self.client.session_transaction() as session:
-            self.token = session['places_csrf']
-        self.data = dict(PLACES[0], name='Ilam Tea Gardens', action='add', csrf_token=self.token)
+            self.token = session['csrf_token']
+        # These tests run against the same MySQL database the app uses, so
+        # snapshot the real rows here and restore them in tearDown instead
+        # of touching a disposable per-test database.
+        with app.app_context():
+            self.snapshot = query("SELECT * FROM explore_places ORDER BY id")
+        self.data = dict(SEED_PLACES[0], name='Ilam Tea Gardens', action='add', csrf_token=self.token)
         self.data.update(highlights='Tea gardens, Sunrise', activities='Walking, Tea tasting')
+        self.data.pop('slug', None)
 
     def tearDown(self):
-        app.config.clear()
-        app.config.update(self.previous)
-        self.directory.cleanup()
+        with app.app_context():
+            execute("DELETE FROM explore_places")
+            for row in self.snapshot:
+                execute(
+                    """
+                    INSERT INTO explore_places
+                        (id, slug, name, region, category, budget, days, weather, best_time, image, description, highlights, activities)
+                    VALUES (%(id)s, %(slug)s, %(name)s, %(region)s, %(category)s, %(budget)s, %(days)s, %(weather)s,
+                            %(best_time)s, %(image)s, %(description)s, %(highlights)s, %(activities)s)
+                    """,
+                    row,
+                )
 
     def login(self, role):
         with self.client.session_transaction() as session:
             session['username'] = 'tester'
             session['user'] = role
+            # Real logins always set user_id alongside username/user (see
+            # login() in app.py) -- explore_places() relies on it being
+            # there, so this fake login needs to match that shape too.
+            session['user_id'] = 1
 
     def test_add_edit_delete_and_traveller_visibility(self):
         self.assertEqual(self.client.post('/admin/places', data=self.data).status_code, 302)
@@ -39,7 +55,7 @@ class PlacesTests(unittest.TestCase):
         self.data.update(action='edit', slug='ilam-tea-gardens', name='Ilam Hills')
         self.assertEqual(self.client.post('/admin/places', data=self.data).status_code, 302)
         with app.app_context():
-            self.assertTrue(any(p['name'] == 'Ilam Hills' for p in get_places(PLACES)))
+            self.assertTrue(any(p['name'] == 'Ilam Hills' for p in get_places()))
         self.login(0)
         self.assertIn(b'Ilam Hills', self.client.get('/explore_places/ilam-tea-gardens').data)
         self.login(1)
@@ -71,10 +87,10 @@ class PlacesTests(unittest.TestCase):
         self.assertTrue(self.client.get('/admin/places').location.endswith('/login'))
 
     def test_empty_catalogue_stays_empty(self):
-        for place in PLACES:
+        for place in self.snapshot:
             self.client.post('/admin/places', data=dict(action='delete', slug=place['slug'], csrf_token=self.token))
         with app.app_context():
-            self.assertEqual(get_places(PLACES), [])
+            self.assertEqual(get_places(), [])
         self.assertIn(b'Start your collection', self.client.get('/admin/places').data)
 
 

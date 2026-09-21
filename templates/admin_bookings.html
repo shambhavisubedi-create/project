@@ -77,9 +77,14 @@
   .edit-form .field { min-width: 180px; }
 
   .empty { text-align: center; color: var(--text-muted); padding: 30px; }
+  .pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 18px 0; font-size: 0.85rem; color: var(--text-muted); }
+  .pagination a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+  .pagination a:hover { text-decoration: underline; }
 
   .badge.pending { background: #fdead1; color: #8a5a1c; }
   .badge.cancel-requested { background: #fbe4e6; color: var(--primary-dark); }
+  .badge.paid { background: #e5f3ec; color: #286650; }
+  .badge.unpaid { background: #eee8e4; color: #736660; }
 
   .action-row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
   .btn-approve { background: #286650; color: white; border: none; padding: 9px 18px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
@@ -97,6 +102,7 @@
 </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
 </head>
 <body>
 <div class="app-shell">
@@ -155,10 +161,19 @@
           {% endfor %}
         </select>
       </div>
+      <div class="field">
+        <label for="payment">Payment</label>
+        <select id="payment" name="payment">
+          <option value="">Any payment status</option>
+          {% for item in ['Paid', 'Unpaid'] %}
+            <option value="{{ item }}" {% if selected_payment==item %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </div>
       <div class="field" style="flex: 0;">
         <button type="submit" class="btn">Filter</button>
       </div>
-      {% if search or selected_status %}
+      {% if search or selected_status or selected_payment %}
         <div class="field" style="flex: 0;">
           <a href="{{ url_for('admin_bookings') }}" class="btn-outline">Clear</a>
         </div>
@@ -188,60 +203,72 @@
               </div>
             </div>
             <div class="booking-right">
+              <span class="badge {{ 'paid' if booking.payment_status == 'Paid' else 'unpaid' }}">{{ booking.payment_status }}</span>
               <div class="booking-price">{{ booking.price|npr }}</div>
             </div>
           </div>
 
-          {% if booking.status == 'Pending' %}
+          {% if booking.has_open_refund %}
             <div class="action-row">
-              <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}">
-                <input type="hidden" name="status" value="Confirmed">
-                <input type="hidden" name="search" value="{{ search }}">
-                <input type="hidden" name="status_filter" value="{{ selected_status }}">
-                <button type="submit" class="btn-approve">Confirm booking</button>
-              </form>
-              <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}">
-                <input type="hidden" name="status" value="Cancelled">
-                <input type="hidden" name="search" value="{{ search }}">
-                <input type="hidden" name="status_filter" value="{{ selected_status }}">
-                <button type="submit" class="btn-decline">Decline</button>
-              </form>
+              <a class="btn-outline" href="{{ url_for('admin_refunds') }}">This is a paid cancellation with a refund request &rarr; Manage Refunds</a>
             </div>
-          {% elif booking.status == 'Cancel Requested' %}
-            <div class="action-row">
-              <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}">
-                <input type="hidden" name="status" value="Cancelled">
-                <input type="hidden" name="search" value="{{ search }}">
-                <input type="hidden" name="status_filter" value="{{ selected_status }}">
-                <button type="submit" class="btn-approve">Approve cancellation</button>
-              </form>
-              <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}">
-                <input type="hidden" name="status" value="Confirmed">
-                <input type="hidden" name="search" value="{{ search }}">
-                <input type="hidden" name="status_filter" value="{{ selected_status }}">
-                <button type="submit" class="btn-decline">Keep booking</button>
-              </form>
-            </div>
-          {% endif %}
+          {% else %}
+            {% if booking.status == 'Pending' %}
+              <div class="action-row">
+                <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="status" value="Confirmed">
+                  <input type="hidden" name="search" value="{{ search }}">
+                  <input type="hidden" name="status_filter" value="{{ selected_status }}">
+                  <input type="hidden" name="payment" value="{{ selected_payment }}">
+                  <button type="submit" class="btn-approve">Confirm booking</button>
+                </form>
+                <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="status" value="Cancelled">
+                  <input type="hidden" name="search" value="{{ search }}">
+                  <input type="hidden" name="status_filter" value="{{ selected_status }}">
+                  <input type="hidden" name="payment" value="{{ selected_payment }}">
+                  <button type="submit" class="btn-decline">Decline</button>
+                </form>
+              </div>
+            {% elif booking.status == 'Cancel Requested' %}
+              <div class="action-row">
+                <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="status" value="Cancelled">
+                  <input type="hidden" name="search" value="{{ search }}">
+                  <input type="hidden" name="status_filter" value="{{ selected_status }}">
+                  <input type="hidden" name="payment" value="{{ selected_payment }}">
+                  <button type="submit" class="btn-approve">Approve cancellation</button>
+                </form>
+                <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="status" value="Confirmed">
+                  <input type="hidden" name="search" value="{{ search }}">
+                  <input type="hidden" name="status_filter" value="{{ selected_status }}">
+                  <input type="hidden" name="payment" value="{{ selected_payment }}">
+                  <button type="submit" class="btn-decline">Keep booking</button>
+                </form>
+              </div>
+            {% endif %}
 
-          <details class="edit-panel">
-            <summary>Update status</summary>
-            <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}" class="edit-form">
-              <input type="hidden" name="search" value="{{ search }}">
-              <input type="hidden" name="status_filter" value="{{ selected_status }}">
-              <div class="field">
-                <label>Booking status</label>
-                <select name="status">
-                  {% for item in ['Confirmed', 'Completed', 'Cancelled'] %}
-                    <option value="{{ item }}" {% if booking.status==item %}selected{% endif %}>{{ item }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="field" style="flex: 0;">
-                <button type="submit" class="btn-outline">Save</button>
-              </div>
-            </form>
-          </details>
+            <details class="edit-panel">
+              <summary>Update status</summary>
+              <form method="post" action="{{ url_for('update_booking_status', booking_id=booking.id) }}" class="edit-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="search" value="{{ search }}">
+                <input type="hidden" name="status_filter" value="{{ selected_status }}">
+                <input type="hidden" name="payment" value="{{ selected_payment }}">
+                <div class="field">
+                  <label>Booking status</label>
+                  <select name="status">
+                    {% for item in ['Confirmed', 'Completed', 'Cancelled'] %}
+                      <option value="{{ item }}" {% if booking.status==item %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="field" style="flex: 0;">
+                  <button type="submit" class="btn-outline">Save</button>
+                </div>
+              </form>
+            </details>
+          {% endif %}
         </div>
       {% endfor %}
     {% else %}
@@ -249,10 +276,23 @@
     {% endfor %}
   </section>
 
+  {% if total_pages > 1 %}
+    <nav class="pagination">
+      {% if page > 1 %}
+        <a href="{{ url_for('admin_bookings', search=search, status=selected_status, payment=selected_payment, page=page-1) }}">&larr; Previous</a>
+      {% endif %}
+      <span>Page {{ page }} of {{ total_pages }}</span>
+      {% if page < total_pages %}
+        <a href="{{ url_for('admin_bookings', search=search, status=selected_status, payment=selected_payment, page=page+1) }}">Next &rarr;</a>
+      {% endif %}
+    </nav>
+  {% endif %}
+
 </main>
 
   </div>
 </div>
 <script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+{% include "_ui_foot.html" %}
 </body>
 </html>

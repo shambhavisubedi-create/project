@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoGather - Verify OTP</title>
+<style>
+  :root {
+    --primary: #a9455c;
+    --primary-dark: #8a3549;
+    --charcoal: #2c2420;
+    --text: #4a3d38;
+    --text-muted: #8a7b73;
+    --border: #f0e3d5;
+    --bg: #fdf3ea;
+    --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  h1 { font-family: var(--font-display); color: var(--charcoal); margin: 0 0 8px; }
+  a { color: var(--primary-dark); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .navbar { background: var(--bg); border-bottom: 1px solid var(--border); }
+  .navbar-inner { max-width: 1200px; margin: 0 auto; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; color: var(--charcoal); }
+  .form-panel { display: flex; align-items: center; justify-content: center; padding: 60px 24px; min-height: calc(100vh - 68px); }
+  .form-card { width: 100%; max-width: 420px; background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 32px; }
+  .form-card p.subtitle { color: var(--text-muted); margin-bottom: 26px; }
+  .form-group { margin-bottom: 16px; }
+  label { display: block; font-weight: 600; font-size: 0.87rem; margin-bottom: 6px; }
+  input[type=text], input[type=password] {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.92rem;
+    background: #fff;
+    color: var(--text);
+    font-family: inherit;
+  }
+  input[readonly] { background: #f5eee6; color: var(--text-muted); }
+  input:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+  .btn {
+    display: inline-block;
+    width: 100%;
+    padding: 10px 22px;
+    border-radius: 999px;
+    border: none;
+    background: var(--primary);
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn:hover { background: var(--primary-dark); }
+  hr.sep { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .flash { background: #e5f3ec; border: 1px solid #bfe0cf; color: #286650; padding: 10px 14px; border-radius: 10px; font-size: 0.85rem; margin-bottom: 16px; }
+  .error-box { background: #fbe7e3; border: 1px solid #e6b6ab; color: #8a3549; padding: 10px 14px; border-radius: 10px; font-size: 0.85rem; margin-bottom: 16px; }
+</style>
+{% include "_ui_head.html" %}
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="navbar-inner">
+      <a class="brand" href="/">GoGather</a>
+    </div>
+  </header>
+
+  <div class="form-panel">
+    <div class="form-card">
+      <h1>Enter your code</h1>
+      <p class="subtitle">Enter the 6-digit code we emailed you and choose a new password.</p>
+
+      {% with messages=get_flashed_messages(with_categories=true) %}
+        {% for c,m in messages %}
+          <div class="flash">{{ m }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      {% if error %}
+      <div class="error-box">{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('verify_otp') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+          <label for="phone">Account</label>
+          <input type="text" id="phone" name="phone" value="{{ phone }}" readonly>
+        </div>
+        <div class="form-group">
+          <label for="otp">OTP code</label>
+          <input type="text" id="otp" name="otp" placeholder="6-digit code" inputmode="numeric" maxlength="6" required autofocus>
+        </div>
+        <div class="form-group">
+          <label for="password">New password</label>
+          <input type="password" id="password" name="password" required>
+        </div>
+        <div class="form-group">
+          <label for="confirm_password">Confirm new password</label>
+          <input type="password" id="confirm_password" name="confirm_password" required>
+        </div>
+        <button type="submit" class="btn">Reset password</button>
+      </form>
+
+      <hr class="sep">
+      <p class="subtitle">Didn't get a code? <a href="{{ url_for('forgot_password') }}">Request a new one</a></p>
+      <p class="subtitle"><a href="{{ url_for('login') }}">Back to sign in</a></p>
+    </div>
+  </div>
+
+{% include "_ui_foot.html" %}
+</body>
+</html>

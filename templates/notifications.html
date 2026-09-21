@@ -6,6 +6,7 @@
   <title>Notifications | GoGather</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
 </head>
 <body class="notification-page">
 <div class="app-shell">
@@ -23,7 +24,7 @@
       <div class="inbox-toolbar">
         <div><h2 id="inbox-title">Notifications</h2><p>{{ notifications|length }} total &middot; {{ unread_notification_count|default(0) }} unread</p></div>
         {% if unread_notification_count|default(0) %}
-        <form action="{{ url_for('read_notifications') }}" method="post"><button type="submit">Mark all as read</button></form>
+        <form action="{{ url_for('read_notifications') }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">Mark all as read</button></form>
         {% endif %}
       </div>
       {% if notifications %}
@@ -49,5 +50,6 @@
   </div>
 </div>
 <script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+{% include "_ui_foot.html" %}
 </body>
 </html>

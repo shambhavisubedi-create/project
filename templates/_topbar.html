@@ -2,6 +2,11 @@
   <button class="hamburger" id="sidebarToggle" type="button" aria-label="Toggle navigation">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
+  {% if role_label|default('Traveller') == 'Traveller' %}
+  <form class="topbar-search" action="{{ url_for('search') }}" method="get" role="search" data-no-lock>
+    <input type="search" name="q" value="{{ request.args.get('q', '') if request.endpoint == 'search' else '' }}" placeholder="Search places &amp; packages" aria-label="Search places and packages" minlength="2" maxlength="80">
+  </form>
+  {% endif %}
   <div class="topbar-spacer"></div>
   {% include "_notification_link.html" %}
   <div class="topbar-user">

@@ -46,11 +46,34 @@
   .hero-banner-art { width: 110px; height: 110px; flex-shrink: 0; border-radius: 999px; overflow: hidden; }
   .hero-banner-art img { width: 100%; height: 100%; object-fit: cover; }
 
+  /* balance toggle */
+  .balance-box { display: inline-block; margin-top: 12px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow); }
+  .balance-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 3px; }
+  .balance-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .balance-amount { font-family: var(--font-display); font-size: 1rem; font-weight: 700; color: var(--charcoal); letter-spacing: 0.02em; }
+  .eye-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1px solid var(--primary-light); background: var(--primary-light); color: var(--primary-dark); border-radius: 999px; cursor: pointer; flex-shrink: 0; }
+  .eye-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
+  .eye-btn svg { width: 13px; height: 13px; }
+
   /* Stats row */
   .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 16px; margin-bottom: 24px; }
-  .stat-tile { background: var(--card-bg); border:1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+  .stat-tile { display: block; background: var(--card-bg); border:1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); text-decoration: none; transition: box-shadow .15s, transform .15s; }
+  .stat-tile:hover, .stat-tile:focus-visible { text-decoration: none; box-shadow: 0 8px 20px rgba(44,36,32,0.12); transform: translateY(-2px); }
   .stat-tile .num { font-size: 1.8rem; font-weight:700; color: var(--primary-dark); }
   .stat-tile .label { color: var(--text-muted); font-size:0.85rem; }
+
+  /* Next step + journey progress */
+  .next-step { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; margin-bottom: 24px; box-shadow: var(--shadow); }
+  .journey { list-style: none; display: flex; gap: 8px; margin: 0 0 16px; padding: 0; flex-wrap: wrap; }
+  .journey li { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); padding-right: 14px; }
+  .journey li span { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border); background: #fff; font-size: 0.75rem; }
+  .journey li.done { color: var(--primary-dark); }
+  .journey li.done span { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .next-body { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .next-body h2 { margin: 0 0 4px; font-size: 1.25rem; }
+  .next-body p { margin: 0; color: var(--text-muted); }
+  .btn-next { background: var(--primary); color: #fff; padding: 11px 22px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
+  .btn-next:hover { background: var(--primary-dark); text-decoration: none; }
 
   /* Popular destinations */
   .destinations { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 34px; }
@@ -80,6 +103,7 @@
 </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
 </head>
 <body>
 <div class="app-shell">
@@ -96,27 +120,53 @@
       <div>
         <h1>Welcome, {{ session.username }}!</h1>
         <p>Explore destinations, book your next trip, and travel together.</p>
+        <div class="balance-box">
+          <div class="balance-label">Your Balance</div>
+          <div class="balance-row">
+            <span class="balance-amount" id="balanceAmount" data-value="{{ traveller_balance|npr }}">••••••</span>
+            <button type="button" class="eye-btn" id="balanceToggle" aria-pressed="false" aria-label="Show balance">
+              <svg id="balanceEyeOpenIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg id="balanceEyeClosedIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M3 3l18 18"/><path d="M10.6 10.6a3 3 0 0 0 4.24 4.24"/><path d="M9.9 4.24A11 11 0 0 1 12 4c7 0 11 8 11 8a17.7 17.7 0 0 1-3.22 4.36"/><path d="M6.1 6.1A17.7 17.7 0 0 0 1 12s4 8 11 8a11 11 0 0 0 4.24-.84"/></svg>
+            </button>
+          </div>
+        </div>
       </div>
       <div class="hero-banner-art">
         <img src="/static/pict1.jpg" alt="">
       </div>
     </div>
 
+    <!-- "What should I do next?" -- built by build_next_step() in app.py -->
+    <section class="next-step" aria-label="Your next step">
+      <ol class="journey">
+        {% for label, done in next_step.steps %}
+          <li class="{{ 'done' if done else '' }}"><span>{{ '✓' if done else loop.index }}</span>{{ label }}</li>
+        {% endfor %}
+      </ol>
+      <div class="next-body">
+        <div>
+          <h2>{{ next_step.title }}</h2>
+          <p>{{ next_step.text }}</p>
+        </div>
+        <a class="btn-next" href="{{ next_step.url }}">{{ next_step.button }} →</a>
+      </div>
+    </section>
+
     <!-- Stats row: these three numbers were passed in from app.py's
          dashboard() function via render_template(...) -->
     <div class="stats-row">
-      <div class="stat-tile">
+      <a class="stat-tile" href="{{ url_for('my_bookings') }}">
         <div class="num">{{ my_bookings_count }}</div>
         <div class="label">My Bookings</div>
-      </div>
-      <div class="stat-tile">
+      </a>
+      <a class="stat-tile" href="{{ url_for('travel_groups') }}">
         <div class="num">{{ my_groups_count }}</div>
         <div class="label">Groups Joined</div>
-      </div>
-      <div class="stat-tile">
+      </a>
+      <a class="stat-tile" href="{{ url_for('packages') }}">
         <div class="num">{{ featured_packages|length }}</div>
         <div class="label">Featured Packages</div>
-      </div>
+      </a>
     </div>
 
     <!-- Popular destinations, pulled from the same catalogue as Explore Places -->
@@ -150,7 +200,7 @@
         </div>
         <div class="card-footer">
           <span class="price">{{ pkg.price|npr }}</span>
-          <a class="btn-sm" href="#">View</a>
+          <a class="btn-sm" href="{{ url_for('package_detail', package_id=pkg.id) }}">View</a>
         </div>
       </div>
       {% else %}
@@ -168,5 +218,27 @@
   </div>
 </div>
 <script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+<script>
+  document.getElementById('balanceToggle').addEventListener('click', function () {
+    var amountEl = document.getElementById('balanceAmount');
+    var eyeOpen = document.getElementById('balanceEyeOpenIcon');
+    var eyeClosed = document.getElementById('balanceEyeClosedIcon');
+    var isHidden = amountEl.textContent.indexOf('•') !== -1;
+    if (isHidden) {
+      amountEl.textContent = amountEl.dataset.value;
+      eyeOpen.hidden = true;
+      eyeClosed.hidden = false;
+      this.setAttribute('aria-pressed', 'true');
+      this.setAttribute('aria-label', 'Hide balance');
+    } else {
+      amountEl.textContent = '••••••';
+      eyeOpen.hidden = false;
+      eyeClosed.hidden = true;
+      this.setAttribute('aria-pressed', 'false');
+      this.setAttribute('aria-label', 'Show balance');
+    }
+  });
+</script>
+{% include "_ui_foot.html" %}
 </body>
 </html>

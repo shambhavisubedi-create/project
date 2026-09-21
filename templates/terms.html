@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoGather - Terms &amp; Conditions</title>
+<style>
+  :root {
+    --primary: #a9455c;
+    --primary-dark: #8a3549;
+    --primary-light: #fbe4e6;
+    --charcoal: #2c2420;
+    --text: #4a3d38;
+    --text-muted: #8a7b73;
+    --border: #f0e3d5;
+    --bg: #fdf3ea;
+    --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: var(--bg); color: var(--text); }
+  a { color: var(--primary-dark); }
+  .navbar { background: var(--bg); border-bottom: 1px solid var(--border); }
+  .navbar-inner { max-width: 900px; margin: 0 auto; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; color: var(--charcoal); text-decoration: none; }
+  main { max-width: 780px; margin: 0 auto; padding: 40px 28px 70px; }
+  h1 { font-family: var(--font-display); color: var(--charcoal); font-size: 2rem; margin: 0 0 6px; }
+  .updated { color: var(--text-muted); font-size: 0.85rem; margin: 0 0 30px; }
+  h2 { font-family: var(--font-display); color: var(--charcoal); font-size: 1.3rem; margin: 34px 0 10px; }
+  p, li { line-height: 1.7; font-size: 0.95rem; }
+  ul { padding-left: 20px; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 28px 32px; }
+  .back { display: inline-block; margin-top: 30px; font-weight: 600; }
+  .highlight { background: #f8ebe5; border-radius: 10px; padding: 14px 18px; }
+</style>
+{% include "_ui_head.html" %}
+</head>
+<body>
+  <div class="navbar"><div class="navbar-inner"><a class="brand" href="{{ url_for('landing') }}">GoGather</a></div></div>
+  <main>
+    <h1>Terms &amp; Conditions</h1>
+    <p class="updated">Covers account use, booking conduct, payments, cancellations/refunds, and third-party services. Read alongside the <a href="{{ url_for('privacy') }}">Privacy Policy</a>.</p>
+    <div class="card">
+      <p>By creating a GoGather account, or by booking a package through GoGather, you agree to the terms on this
+      page. If you don't agree with any part of them, please don't register or book through the platform.</p>
+
+      <h2>1. Your account</h2>
+      <ul>
+        <li>You're responsible for keeping your password private and for anything done from your account.</li>
+        <li>The contact phone number on your profile is used for all your bookings -- keep it up to date.</li>
+        <li>Don't create an account using someone else's name, phone number or payment details.</li>
+      </ul>
+
+      <h2>2. Booking conduct</h2>
+      <ul>
+        <li>A booking request is only confirmed once an admin approves it -- submitting a request doesn't guarantee
+          a seat, especially on packages with a limited number of seats per departure date.</li>
+        <li>Give accurate traveller counts and travel dates. GoGather may cancel a booking made with false information.</li>
+        <li>In a travel group, be respectful in group chat -- abusive or fraudulent behaviour may get a member or a
+          group removed by an admin.</li>
+      </ul>
+
+      <h2>3. Payments</h2>
+      <p>Card payments are processed by <strong>Stripe</strong>, and local payments by <strong>eSewa</strong> --
+      both independent, third-party payment providers with their own terms and privacy practices. GoGather never
+      stores your full card number or eSewa credentials; we only keep a transaction reference once a payment
+      succeeds. A GoGather service fee of {{ service_fee_percent|round|int }}% is added to every booking's price
+      to cover platform costs.</p>
+
+      <h2 id="refund">4. Cancellation &amp; refund policy</h2>
+      <div class="highlight">
+        <p style="margin-top:0"><strong>By booking, you accept this refund policy:</strong></p>
+        <ul style="margin-bottom:0">
+          <li>An unpaid, <strong>Pending</strong> booking can be cancelled by you at any time with no charge.</li>
+          <li>A <strong>Confirmed but unpaid</strong> booking can be cancelled, but needs admin approval since a seat
+            was already held for you.</li>
+          <li>A <strong>paid, Confirmed</strong> booking can still be cancelled, but a flat
+            <strong>{{ cancellation_fee_percent|round|int }}% cancellation fee</strong> applies -- the remaining
+            amount is refunded once an admin approves the request and processes it. This fee is the same regardless
+            of how far ahead of the travel date you cancel.</li>
+          <li>Refunds are tracked from <strong>Requested</strong> through <strong>Approved</strong>,
+            <strong>Refund Pending</strong>, to <strong>Refunded</strong> (or <strong>Rejected</strong>, with a
+            reason shown to you) -- you can follow the status of your own request from My Bookings at any time.</li>
+          <li>A refund is only paid back to the original payment method once an admin has recorded the payment
+            provider's actual refund reference -- marking a booking "Refunded" isn't optional or automatic.</li>
+        </ul>
+      </div>
+
+      <h2>5. Third-party and external websites</h2>
+      <p>GoGather links out to, or redirects you to, a number of services we don't run ourselves -- payment pages on
+      Stripe and eSewa, and general information about destinations. We don't control the content, availability or
+      privacy practices of any external website, and we're not responsible for anything that happens on one.
+      Visiting or transacting on a third-party site is between you and that site -- read its own terms before using
+      it.</p>
+
+      <h2>6. Reviews</h2>
+      <p>You may only leave a review for a package once your own booking for it is marked Completed. Reviews should
+      be honest and about your own experience -- GoGather admins may remove a review that's abusive, fraudulent, or
+      unrelated to the trip.</p>
+
+      <h2>7. Limitation of liability</h2>
+      <p>GoGather arranges bookings with third-party suppliers (hotels, transport, guides) but doesn't operate
+      treks, safaris or transport itself. We aren't liable for weather delays, natural events, or a supplier's own
+      failure to deliver a service, beyond helping coordinate a resolution and, where our refund policy above
+      applies, a refund of what you paid GoGather.</p>
+
+      <h2>8. Changes to these terms</h2>
+      <p>We may update these terms as GoGather's features change (for example, if the cancellation fee or service
+      fee percentage changes). Continuing to use GoGather after an update means you accept the current version.</p>
+
+      <h2>Contact</h2>
+      <p>Questions about these terms can be directed to a GoGather admin through the platform.</p>
+    </div>
+    <a class="back" href="{{ url_for('landing') }}">&larr; Back to GoGather</a>
+  </main>
+{% include "_ui_foot.html" %}
+</body>
+</html>

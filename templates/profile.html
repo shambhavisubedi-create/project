@@ -14,49 +14,127 @@
     --text-muted: #8a7b73;
     --border: #f0e3d5;
     --bg: #fdf3ea;
+    --cream-deep: #fbe7e3;
     --white: #fff;
     --font-display: Georgia, serif;
   }
 
   * { box-sizing: border-box; }
 
-  body { margin: 0; background: var(--bg); color: var(--text); font-family: Arial, sans-serif; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; }
 
-  .container { max-width: 650px; margin: auto; padding: 45px 25px; }
-  .profile-card { background: white; border: 1px solid var(--border); border-radius: 18px; padding: 30px; }
+  .container { max-width: 640px; margin: auto; padding: 45px 25px; }
 
-  .avatar {
-    width: 80px;
-    height: 80px;
-    background: var(--primary-light);
-    color: var(--primary-dark);
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 30px;
-    margin-bottom: 20px;
+  .profile-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(80, 50, 40, 0.07);
   }
 
-  h1 { font-family: var(--font-display); color: var(--charcoal); }
+  .profile-banner {
+    height: 110px;
+    background: linear-gradient(120deg, var(--cream-deep), var(--primary-light));
+  }
 
+  .profile-head {
+    text-align: center;
+    padding: 0 30px 26px;
+    margin-top: -60px;
+  }
+
+  /* Avatar + upload control */
+  .avatar-wrap {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 14px;
+  }
+  .avatar-circle {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 4px solid white;
+    box-shadow: 0 6px 18px rgba(80, 50, 40, 0.15);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    cursor: pointer;
+  }
+  .avatar-circle img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .avatar-initial { color: white; font-family: var(--font-display); font-size: 2.6rem; font-weight: 700; }
+
+  .avatar-edit-btn {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: 3px solid white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(80, 50, 40, 0.25);
+    transition: background 0.15s;
+  }
+  .avatar-edit-btn:hover { background: var(--primary-dark); }
+  .avatar-edit-btn svg { width: 16px; height: 16px; stroke: white; }
+  .avatar-input { display: none; }
+  .avatar-hint { color: var(--text-muted); font-size: 0.78rem; text-align: center; margin: -6px 0 22px; }
+
+  .profile-name { font-family: var(--font-display); color: var(--charcoal); font-size: 1.5rem; margin: 4px 0 2px; }
+  .profile-username { color: var(--text-muted); font-size: 0.9rem; }
+
+  .divider { height: 1px; background: var(--border); margin: 0 30px; }
+
+  .form-area { padding: 26px 30px 30px; }
+
+  .flash-msg { padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; font-size: 0.9rem; }
+  .flash-msg.success { background: #e5f3ec; color: #286650; }
+  .flash-msg.error { background: #f9e6e8; color: #9b3544; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   .form-group { margin-bottom: 18px; }
-  label { display: block; font-weight: bold; margin-bottom: 7px; }
-  input { width: 100%; padding: 11px; border: 1px solid var(--border); border-radius: 10px; }
+  label { display: block; font-weight: 700; font-size: 0.85rem; color: var(--charcoal); margin-bottom: 7px; }
+  input[type="text"], input[type="email"], input[type="tel"] {
+    width: 100%;
+    padding: 11px 13px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.92rem;
+    background: #fffaf5;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+  input[readonly] { background: var(--border); color: var(--text-muted); cursor: not-allowed; }
 
   .btn {
     width: 100%;
-    padding: 11px;
+    padding: 12px;
     border: none;
-    border-radius: 22px;
+    border-radius: 999px;
     background: var(--primary);
     color: white;
-    font-weight: bold;
+    font-weight: 700;
+    font-size: 0.95rem;
     cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: var(--primary-dark); }
+
+  @media (max-width: 500px) {
+    .form-grid { grid-template-columns: 1fr; }
   }
 </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
 </head>
 <body>
 <div class="app-shell">
@@ -67,43 +145,103 @@
 
 <main class="container">
   <div class="profile-card">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for category, message in messages %}
-        <p style="padding: 10px; border-radius: 8px; background: {% if category == 'success' %}#e5f3ec{% else %}#f9e6e8{% endif %}; color: {% if category == 'success' %}#286650{% else %}#9b3544{% endif %};">{{ message }}</p>
-      {% endfor %}
-    {% endwith %}
-    
-    <div class="avatar">👤</div>
-    <h1>My Profile</h1>
+    <div class="profile-banner"></div>
 
-    <form method="POST" action="/profile">
-      <div class="form-group">
-        <label for="full_name">Full Name</label>
-        <input type="text" id="full_name" name="full_name" value="{{ user.full_name or '' }}">
+    <div class="profile-head">
+      <div class="avatar-wrap">
+        <label for="avatarInput" class="avatar-circle" id="avatarPreviewWrap">
+          {% if user.avatar %}
+            <img src="{{ url_for('static', filename=user.avatar) }}" alt="Your profile photo" id="avatarPreview">
+          {% else %}
+            <span class="avatar-initial" id="avatarInitial">{{ (user.full_name or user.username)[0]|upper }}</span>
+            <img src="" alt="" id="avatarPreview" style="display:none;">
+          {% endif %}
+        </label>
+        <label for="avatarInput" class="avatar-edit-btn" title="Change photo">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </label>
       </div>
 
-      <div class="form-group">
-        <label for="username">Username</label>
-        <input type="text" id="username" name="username" value="{{ user.username }}" readonly>
-      </div>
+      <h1 class="profile-name">{{ user.full_name or user.username }}</h1>
+      <div class="profile-username">@{{ user.username }}</div>
+    </div>
 
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" name="email" value="{{ user.email or '' }}">
-      </div>
+    <div class="divider"></div>
 
-      <div class="form-group">
-        <label for="phone">Phone</label>
-        <input type="tel" id="phone" name="phone" value="{{ user.phone or '' }}">
-      </div>
+    <div class="form-area">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="flash-msg {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
 
-      <button type="submit" class="btn">Save Changes</button>
-    </form>
+      <form method="POST" action="/profile" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="file" id="avatarInput" name="avatar" accept="image/png,image/jpeg,image/webp" class="avatar-input">
+        <p class="avatar-hint">Click your photo to change it &middot;</p>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="full_name">Full Name</label>
+            <input type="text" id="full_name" name="full_name" value="{{ user.full_name or '' }}">
+          </div>
+
+          <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" value="{{ user.username }}" readonly>
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="{{ user.email or '' }}">
+          </div>
+
+          <div class="form-group">
+            <label for="phone">Phone</label>
+            <input type="tel" id="phone" name="phone" value="{{ user.phone or '' }}">
+          </div>
+        </div>
+
+        <button type="submit" class="btn">Save Changes</button>
+      </form>
+
+      <div class="divider" style="margin:28px 0"></div>
+
+      <form method="POST" action="{{ url_for('change_password') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <h2 style="margin:0 0 14px;font-size:1.15rem">Change password</h2>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="current_password">Current password</label>
+            <input type="password" id="current_password" name="current_password" autocomplete="current-password" required>
+          </div>
+          <div class="form-group">
+            <label for="new_password">New password</label>
+            <input type="password" id="new_password" name="new_password" autocomplete="new-password" minlength="8" required>
+          </div>
+          <div class="form-group">
+            <label for="confirm_password">Confirm new password</label>
+            <input type="password" id="confirm_password" name="confirm_password" autocomplete="new-password" minlength="8" required>
+          </div>
+        </div>
+        <button type="submit" class="btn">Update password</button>
+      </form>
+    </div>
   </div>
 </main>
 
   </div>
 </div>
 <script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+<script>
+  document.getElementById('avatarInput').addEventListener('change', function (e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var img = document.getElementById('avatarPreview');
+    var initial = document.getElementById('avatarInitial');
+    img.src = URL.createObjectURL(file);
+    img.style.display = 'block';
+    if (initial) initial.style.display = 'none';
+  });
+</script>
+{% include "_ui_foot.html" %}
 </body>
 </html>

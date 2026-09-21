@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoGather - My Reports</title>
+<style>
+  :root {
+    --primary:       #a9455c;
+    --primary-dark:  #8a3549;
+    --primary-light: #fbe4e6;
+    --charcoal:      #2c2420;
+    --text:          #4a3d38;
+    --text-muted:    #8a7b73;
+    --border:        #f0e3d5;
+    --bg:            #fdf3ea;
+    --cream-deep:    #fbe7e3;
+    --card-bg:       #fffbf5;
+    --radius:        16px;
+    --shadow:        0 4px 18px rgba(44,36,32,0.06);
+    --font-display:  Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; background: var(--bg); color: var(--text); }
+  h1, h2 { font-family: var(--font-display); color: var(--charcoal); }
+  a { color: var(--primary-dark); }
+
+  .page { max-width: 1100px; margin: 0 auto; padding: 30px 20px 50px; }
+
+  /* Friendly intro banner, same visual family as the dashboard's welcome banner */
+  .hero-banner {
+    background: linear-gradient(120deg, var(--cream-deep), var(--primary-light));
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    margin-bottom: 26px;
+    box-shadow: var(--shadow);
+  }
+  .hero-banner h1 { margin: 0 0 6px; font-size: 1.7rem; }
+  .hero-banner p { margin: 0; color: var(--text-muted); }
+
+  /* Stat tiles: wrap naturally instead of squeezing into a fixed 5-column row */
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px,1fr)); gap: 16px; margin-bottom: 26px; }
+  .stat-tile { display: block; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); text-decoration: none; transition: box-shadow .15s, transform .15s; }
+  .stat-tile:hover, .stat-tile:focus-visible { text-decoration: none; box-shadow: 0 8px 20px rgba(44,36,32,0.12); transform: translateY(-2px); }
+  .stat-tile.accent { background: var(--primary); }
+  .stat-tile .num { font-size: 1.7rem; font-weight: 700; color: var(--primary-dark); font-family: var(--font-display); }
+  .stat-tile.accent .num { color: #fff; }
+  .stat-tile .label { color: var(--text-muted); font-size: 0.85rem; margin-top: 2px; }
+  .stat-tile.accent .label { color: rgba(255,255,255,0.85); }
+  .stat-tile .sub { color: var(--text-muted); font-size: 0.72rem; margin-top: 6px; }
+  .stat-tile.accent .sub { color: rgba(255,255,255,0.75); }
+
+  /* Cards for the chart and the package list */
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 26px 28px; margin-bottom: 24px; }
+  .card h2 { font-size: 1.3rem; margin: 0 0 4px; }
+  .card .helper { color: var(--text-muted); font-size: 0.85rem; margin: 0 0 18px; }
+
+  .empty-note { text-align: center; padding: 40px 20px; color: var(--text-muted); background: var(--card-bg); border: 1px dashed var(--border); border-radius: var(--radius); margin-bottom: 24px; }
+  .empty-note h2 { margin: 0 0 6px; font-size: 1.15rem; }
+  .empty-note a { font-weight: 600; }
+
+  /* Package list: a simple ranked list instead of a dense report table */
+  .package-list { list-style: none; margin: 0; padding: 0; }
+  .package-list li { display: flex; align-items: center; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--border); }
+  .package-list li:last-child { border-bottom: none; }
+  .rank { flex-shrink: 0; width: 34px; height: 34px; border-radius: 999px; background: var(--primary-light); color: var(--primary-dark); font-weight: 700; font-family: var(--font-display); display: flex; align-items: center; justify-content: center; font-size: 0.95rem; }
+  .package-info { flex: 1; min-width: 0; }
+  .package-info .name { font-weight: 700; color: var(--charcoal); }
+  .package-info .count { color: var(--text-muted); font-size: 0.82rem; }
+  .package-paid { text-align: right; font-weight: 700; color: var(--primary-dark); white-space: nowrap; }
+  .package-paid.unpaid { color: var(--text-muted); font-weight: 400; font-size: 0.85rem; }
+
+  .site-footer { margin-top: 10px; padding: 22px 4px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.85rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .site-footer a { color: var(--text-muted); }
+  .site-footer a:hover { color: var(--primary-dark); }
+</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
+</head>
+<body>
+<div class="app-shell">
+  {% include "_sidebar_traveller.html" %}
+  <div class="main">
+  {% set role_label = 'Traveller' %}
+  {% include "_topbar.html" %}
+
+  <div class="page">
+
+    <div class="hero-banner">
+      <h1>Your travel story so far</h1>
+      <p>A quick look back at your bookings, spending and trips with GoGather.</p>
+    </div>
+
+    <div class="stats-row">
+      <a class="stat-tile" href="{{ url_for('my_bookings') }}">
+        <div class="num">{{ total }}</div>
+        <div class="label">Total bookings</div>
+      </a>
+      <a class="stat-tile accent" href="{{ url_for('my_bookings') }}">
+        <div class="num">{{ paid_value|npr }}</div>
+        <div class="label">Amount paid</div>
+        <div class="sub">{{ paid_count }} booking{{ 's' if paid_count != 1 }} via eSewa or card</div>
+      </a>
+      <a class="stat-tile" href="{{ url_for('my_bookings') }}#upcoming">
+        <div class="num">{{ upcoming_count }}</div>
+        <div class="label">Upcoming trips</div>
+      </a>
+      <a class="stat-tile" href="{{ url_for('my_bookings') }}#history">
+        <div class="num">{{ past_count }}</div>
+        <div class="label">Past trips</div>
+      </a>
+      <a class="stat-tile" href="{{ url_for('travel_groups') }}">
+        <div class="num">{{ groups_count }}</div>
+        <div class="label">Groups joined</div>
+      </a>
+    </div>
+
+    {% if not total %}
+      <div class="empty-note">
+        <h2>No bookings yet</h2>
+        <p>Once you book a package, your travel summary will show up here. <a href="{{ url_for('packages') }}">Browse packages &rarr;</a></p>
+      </div>
+    {% else %}
+      <div class="card">
+        <h2>Booking activity</h2>
+        <p class="helper">How many trips you've booked, month by month.</p>
+        <div id="activity-chart"></div>
+      </div>
+
+      <div class="card">
+        <h2>Your most-booked packages</h2>
+        <p class="helper">Top {{ top_packages|length }} by how often you've booked them.</p>
+        <ul class="package-list">
+          {% for package in top_packages %}
+            <li>
+              <span class="rank">{{ loop.index }}</span>
+              <span class="package-info">
+                <span class="name">{{ package.name }}</span><br>
+                <span class="count">{{ package.bookings }} booking{{ 's' if package.bookings != 1 }}</span>
+              </span>
+              {% if package.paid %}
+                <span class="package-paid">{{ package.paid|npr }}</span>
+              {% else %}
+                <span class="package-paid unpaid">Not paid yet</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <footer class="site-footer">
+      <span>GoGather &middot; Every journey tells a story.</span>
+      <a href="{{ url_for('dashboard') }}">&larr; Back to dashboard</a>
+    </footer>
+  </div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+{% if total %}
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script>
+  Highcharts.setOptions({
+    chart: { style: { fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif" } },
+    credits: { enabled: false },
+    title: { text: null }
+  });
+
+  Highcharts.chart('activity-chart', {
+    chart: { type: 'column', height: 280 },
+    xAxis: { categories: {{ timeline|map(attribute='label')|list|tojson }} },
+    yAxis: { title: { text: null }, allowDecimals: false },
+    legend: { enabled: false },
+    tooltip: { headerFormat: '<b>{point.key}</b><br>', pointFormat: '{point.y} booking{point.y === 1 ? "" : "s"}' },
+    plotOptions: { column: { color: '#a9455c', borderRadius: 4, pointPadding: 0.1, groupPadding: 0.08 } },
+    series: [{ name: 'Bookings', data: {{ timeline|map(attribute='count')|list|tojson }} }]
+  });
+</script>
+{% endif %}
+{% include "_ui_foot.html" %}
+</body>
+</html>

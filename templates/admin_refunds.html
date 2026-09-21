@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoGather - Manage Refunds</title>
+<style>
+  :root {
+    --primary: #a9455c;
+    --primary-dark: #8a3549;
+    --primary-light: #fbe4e6;
+    --charcoal: #2c2420;
+    --text: #4a3d38;
+    --text-muted: #8a7b73;
+    --border: #f0e3d5;
+    --bg: #fdf3ea;
+    --white: #ffffff;
+    --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 45px 28px; }
+
+  h1 { font-family: var(--font-display); color: var(--charcoal); font-size: 2rem; margin: 0 0 8px; }
+  .subtitle { color: var(--text-muted); margin: 0 0 30px; }
+
+  .flash { padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; font-size: 0.9rem; }
+  .flash.success { background: #e5f3ec; color: #286650; }
+  .flash.error { background: #f9e6e8; color: #9b3544; }
+
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; margin-bottom: 28px; }
+  .stat-card { background: var(--white); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 5px 18px rgba(80, 50, 40, 0.05); }
+  .stat-card h3 { margin: 0 0 8px; font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
+  .stat-number { font-family: var(--font-display); font-size: 1.8rem; color: var(--charcoal); font-weight: 700; }
+
+  .card { background: var(--white); border: 1px solid var(--border); border-radius: 16px; padding: 26px; box-shadow: 0 5px 18px rgba(80, 50, 40, 0.05); margin-bottom: 28px; }
+  .card h2 { font-family: var(--font-display); color: var(--charcoal); font-size: 1.3rem; margin: 0 0 18px; }
+
+  .filter-form { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+  .filter-form .field { flex: 1; min-width: 180px; }
+  label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px; }
+  input, select, textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 0.9rem; font-family: inherit; }
+  textarea { resize: vertical; }
+
+  .btn { display: inline-block; background: var(--primary); color: white; border: none; text-decoration: none; padding: 9px 18px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  .btn:hover { background: var(--primary-dark); }
+  .btn-outline { background: none; color: var(--primary-dark); border: 1px solid var(--primary-light); padding: 9px 18px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; text-decoration: none; display: inline-block; }
+  .btn-outline:hover { background: var(--primary-light); }
+
+  .status-heading { display: flex; align-items: center; gap: 10px; margin: 28px 0 4px; }
+  .status-heading:first-child { margin-top: 0; }
+  .status-heading-count { color: var(--text-muted); font-size: 0.85rem; font-weight: 600; }
+
+  .refund-row { border-bottom: 1px solid var(--border); padding: 16px 0; }
+  .refund-row:last-child { border-bottom: none; }
+  .refund-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .refund-name { font-weight: 700; color: var(--charcoal); }
+  .refund-meta { color: var(--text-muted); font-size: 0.85rem; margin-top: 2px; }
+  .refund-amount { font-weight: 700; color: var(--primary-dark); white-space: nowrap; text-align: right; }
+  .refund-fee-breakdown { font-weight: 500; color: var(--text-muted); font-size: 0.72rem; white-space: normal; margin-top: 2px; }
+  .fee-collected-badge {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: #e5f3ec;
+    color: #286650;
+    font-size: 0.7rem;
+    font-weight: 700;
+    white-space: normal;
+  }
+  .fee-pending-badge {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--bg);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: normal;
+  }
+
+  .fee-source-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    background: #e5f3ec;
+    border: 1px solid #b9ddc9;
+    border-radius: 16px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+  }
+  .fee-source-icon { font-size: 1.6rem; line-height: 1; }
+  .fee-source-title { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; color: #1f5140; margin-bottom: 4px; }
+  .fee-source-desc { font-size: 0.85rem; color: #286650; }
+  .fee-collected-badge-inline {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #286650;
+    font-weight: 700;
+    font-size: 0.75rem;
+  }
+  .refund-reason { background: var(--bg); border-radius: 10px; padding: 12px 14px; margin-top: 10px; font-size: 0.88rem; }
+  .refund-reason strong { color: var(--charcoal); }
+  .refund-decision { font-size: 0.85rem; margin-top: 10px; color: var(--text-muted); }
+
+  .badge { padding: 6px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
+  .badge.requested { background: #fdead1; color: #8a5a1c; }
+  .badge.approved { background: #fbe4e6; color: var(--primary-dark); }
+  .badge.refund-pending { background: #e3ecfb; color: #2c4f9b; }
+  .badge.refunded { background: #e5f3ec; color: #286650; }
+  .badge.rejected { background: #eee8e4; color: #736660; }
+
+  details.edit-panel { margin-top: 14px; }
+  details.edit-panel summary { cursor: pointer; color: var(--primary-dark); font-weight: 600; font-size: 0.85rem; }
+  .edit-form { margin-top: 12px; padding: 14px; background: var(--bg); border-radius: 10px; display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+  .edit-form .field { min-width: 200px; flex: 1; }
+
+  .action-row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .btn-approve { background: #286650; color: white; border: none; padding: 9px 18px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  .btn-approve:hover { background: #1f5140; }
+  .btn-decline { background: none; color: #9b3544; border: 1px solid #f0c6cb; padding: 9px 18px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  .btn-decline:hover { background: #f9e6e8; }
+
+  .empty { text-align: center; color: var(--text-muted); padding: 30px; }
+
+  @media (max-width: 900px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 700px) {
+    .stats { grid-template-columns: 1fr; }
+  }
+</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
+</head>
+<body>
+<div class="app-shell">
+  {% include "_sidebar_admin.html" %}
+  <div class="main">
+  {% set role_label = 'Admin' %}
+  {% include "_topbar.html" %}
+
+<main class="container">
+
+  <h1>Manage Refunds</h1>
+  <p class="subtitle">Review cancellation requests on paid bookings and track each refund through to completion.</p>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+ 
+  <section class="stats">
+    <div class="stat-card">
+      <h3>Requested</h3>
+      <div class="stat-number">{{ requested_count }}</div>
+    </div>
+    <div class="stat-card">
+      <h3>Approved</h3>
+      <div class="stat-number">{{ approved_count }}</div>
+    </div>
+    <div class="stat-card">
+      <h3>Refund pending</h3>
+      <div class="stat-number">{{ pending_count }}</div>
+    </div>
+    <div class="stat-card">
+      <h3>Refunded</h3>
+      <div class="stat-number">{{ refunded_count }}</div>
+    </div>
+    <div class="stat-card">
+      <h3>Rejected</h3>
+      <div class="stat-number">{{ rejected_count }}</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Filter</h2>
+    <form method="GET" action="{{ url_for('admin_refunds') }}" class="filter-form">
+      <div class="field">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          <option value="">All statuses</option>
+          {% for item in statuses %}
+            <option value="{{ item }}" {% if selected_status==item %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field" style="flex: 0;">
+        <button type="submit" class="btn">Filter</button>
+      </div>
+      {% if selected_status %}
+        <div class="field" style="flex: 0;">
+          <a href="{{ url_for('admin_refunds') }}" class="btn-outline">Clear</a>
+        </div>
+      {% endif %}
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Refund requests ({{ refund_requests|length }})</h2>
+
+    {% for status_name, status_refunds in grouped_refunds %}
+      <h3 class="status-heading">
+        <span class="badge {{ status_name|lower|replace(' ', '-') }}">{{ status_name }}</span>
+        <span class="status-heading-count">{{ status_refunds|length }}</span>
+      </h3>
+
+      {% for r in status_refunds %}
+        <div class="refund-row">
+          <div class="refund-top">
+            <div>
+              <div class="refund-name">{{ r.package_name }} &middot; Booking #{{ r.booking_id }}</div>
+              <div class="refund-meta">
+                {{ r.traveller_name }} (@{{ r.traveller_username }})
+                &middot; Travel date {{ r.travel_date.strftime('%d %b %Y') }}
+                &middot; Requested {{ r.created_at.strftime('%d %b %Y') }}
+              </div>
+            </div>
+            <div class="refund-amount">
+              {{ r.amount|npr }}
+              {% if r.cancellation_fee %}
+                <div class="refund-fee-breakdown">of {{ r.booking_price|npr }} paid &middot; {{ r.cancellation_fee|npr }} cancellation fee withheld</div>
+                {% if r.status == 'Refunded' %}
+                  <span class="fee-collected-badge" title="This fee is counted in the Dashboard's Total Revenue">&#10003; {{ r.cancellation_fee|npr }} fee collected</span>
+                {% else %}
+                  <span class="fee-pending-badge">Fee withheld once refunded &mdash; not yet collected</span>
+                {% endif %}
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="refund-reason"><strong>Traveller's reason:</strong> {{ r.reason }}</div>
+
+          {% if r.admin_notes or r.refund_reference %}
+            <div class="refund-decision">
+              {% if r.admin_notes %}Admin notes: {{ r.admin_notes }}<br>{% endif %}
+              {% if r.refund_reference %}Refund reference: {{ r.refund_reference }}{% endif %}
+            </div>
+          {% endif %}
+
+          {% if r.status == 'Requested' %}
+            <div class="action-row">
+              <form method="post" action="{{ url_for('update_refund_status', refund_id=r.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="status" value="Approved">
+                <input type="hidden" name="status_filter" value="{{ selected_status }}">
+                <button type="submit" class="btn-approve">Approve request</button>
+              </form>
+              <details class="edit-panel">
+                <summary>Reject</summary>
+                <form method="post" action="{{ url_for('update_refund_status', refund_id=r.id) }}" class="edit-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="status" value="Rejected">
+                  <input type="hidden" name="status_filter" value="{{ selected_status }}">
+                  <div class="field">
+                    <label>Reason for rejecting</label>
+                    <textarea name="admin_notes" rows="2" required placeholder="Explain why this request is being declined"></textarea>
+                  </div>
+                  <div class="field" style="flex: 0;">
+                    <button type="submit" class="btn-decline">Reject request</button>
+                  </div>
+                </form>
+              </details>
+            </div>
+          {% elif r.status == 'Approved' %}
+            <div class="action-row">
+              <form method="post" action="{{ url_for('update_refund_status', refund_id=r.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="status" value="Refund Pending">
+                <input type="hidden" name="status_filter" value="{{ selected_status }}">
+                <button type="submit" class="btn-approve">Start refund</button>
+              </form>
+              <details class="edit-panel">
+                <summary>Reject</summary>
+                <form method="post" action="{{ url_for('update_refund_status', refund_id=r.id) }}" class="edit-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="status" value="Rejected">
+                  <input type="hidden" name="status_filter" value="{{ selected_status }}">
+                  <div class="field">
+                    <label>Reason for rejecting</label>
+                    <textarea name="admin_notes" rows="2" required placeholder="Explain why this request is being declined"></textarea>
+                  </div>
+                  <div class="field" style="flex: 0;">
+                    <button type="submit" class="btn-decline">Reject request</button>
+                  </div>
+                </form>
+              </details>
+            </div>
+          {% elif r.status == 'Refund Pending' %}
+            <details class="edit-panel">
+              <summary>Mark as refunded</summary>
+              <form method="post" action="{{ url_for('update_refund_status', refund_id=r.id) }}" class="edit-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="status" value="Refunded">
+                <input type="hidden" name="status_filter" value="{{ selected_status }}">
+                <div class="field">
+                  <label>Payment provider refund reference</label>
+                  <input type="text" name="refund_reference" required placeholder="e.g. eSewa/Stripe reference number">
+                </div>
+                <div class="field" style="flex: 0;">
+                  <button type="submit" class="btn-approve">Confirm refunded</button>
+                </div>
+              </form>
+            </details>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">No refund requests match your filter.</div>
+    {% endfor %}
+  </section>
+
+</main>
+
+  </div>
+</div>
+<script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+<script>
+  document.querySelectorAll('.action-row form, details.edit-panel form').forEach(function (form) {
+    form.addEventListener('submit', function () {
+      var btn = form.querySelector('button[type="submit"]');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+      }
+    });
+  });
+</script>
+{% include "_ui_foot.html" %}
+</body>
+</html>

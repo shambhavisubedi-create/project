@@ -34,12 +34,6 @@
       margin: auto;
       padding: 38px 24px
     }
-    .hero {
-      background: linear-gradient(120deg,#f8dad6,#f7e7d8);
-      border: 1px solid var(--l);
-      border-radius: 18px;
-      padding: 30px
-    }
     .ey {
       color: var(--w);
       font-size: 11px;
@@ -48,12 +42,13 @@
       text-transform: uppercase
     }
     h1 {
-      font-size: 42px;
-      margin: 8px 0
+      font-size: clamp(26px,4vw,34px);
+      margin: 6px 0
     }
-    .hero p {
+    .intro {
       color: var(--m);
-      margin: 0
+      margin: 0 0 18px;
+      max-width: 560px
     }
     .flash {
       padding: 12px;
@@ -129,6 +124,142 @@
       font-weight: bold;
       cursor: pointer
     }
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px
+    }
+    .pay {
+      display: inline-block;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 13px;
+      font-weight: bold;
+      cursor: pointer;
+      color: #fff;
+      text-decoration: none
+    }
+    .pay-esewa {
+      background: #60bb46
+    }
+    .pay-stripe {
+      background: #635bff
+    }
+    .paid {
+      background: #e5f3ec;
+      color: #286650
+    }
+    .refund-status {
+      margin-top: 14px;
+      padding: 11px 13px;
+      border-radius: 8px;
+      font-size: 13px;
+      background: #f8ebe5;
+      color: #74414b
+    }
+    .refund-status span {
+      display: block;
+      margin-top: 4px;
+      color: #8c6a63
+    }
+    .refund-refunded {
+      background: #e5f3ec;
+      color: #286650
+    }
+    .refund-refunded span {
+      color: #3f7a63
+    }
+    .refund-rejected {
+      background: #eee8e4;
+      color: #736660
+    }
+    .refund-request {
+      margin-top: 12px
+    }
+    .refund-fee-notice {
+      flex-basis: 100%;
+      margin: 0 0 4px;
+      font-size: 12px;
+      color: #8a5a1c;
+      background: #fdead1;
+      padding: 8px 10px;
+      border-radius: 8px;
+    }
+    .discount-note {
+      margin: -4px 0 12px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #286650;
+      background: #e5f3ec;
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 999px;
+    }
+    .review-box {
+      margin-top: 14px;
+    }
+    .review-box summary {
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--wine, #a94559);
+    }
+    .review-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+      padding: 12px 14px;
+      background: #f8f4ef;
+      border-radius: 8px;
+    }
+    .review-form label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+      color: #6b5d55;
+    }
+    .review-form select,
+    .review-form textarea {
+      font: inherit;
+      padding: 7px 9px;
+      border-radius: 6px;
+      border: 1px solid #d9cfc5;
+    }
+    .review-form button {
+      align-self: flex-start;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      background: var(--wine, #a94559);
+      color: #fff;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .refund-request summary {
+      cursor: pointer;
+      color: #9a394c;
+      font-weight: bold;
+      font-size: 13px
+    }
+    .refund-request form {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap
+    }
+    .refund-request textarea {
+      flex: 1;
+      min-width: 220px;
+      border: 1px solid var(--l);
+      border-radius: 8px;
+      padding: 9px 11px;
+      font-family: inherit;
+      font-size: 13px;
+      resize: vertical
+    }
     .empty {
       text-align: center;
       padding: 55px;
@@ -157,6 +288,7 @@
   </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
 </head>
 <body>
 <div class="app-shell">
@@ -166,17 +298,15 @@
   {% include "_topbar.html" %}
 
   <main class="wrap">
-    <section class="hero">
-      <div class="ey">Your trips</div>
-      <h1>My bookings</h1>
-      <p>Manage confirmed trips and keep your travel plans in one place.</p>
-    </section>
+    <div class="ey">Your trips</div>
+    <h1>My Bookings</h1>
+    <p class="intro">Manage confirmed trips and keep your travel plans in one place.</p>
     {% with messages=get_flashed_messages(with_categories=true) %}
       {% for c,m in messages %}
         <div class="flash">{{ m }}</div>
       {% endfor %}
     {% endwith %}
-    <h2>Upcoming trips</h2>
+    <h2 id="upcoming">Upcoming trips</h2>
     {% for booking in upcoming_bookings %}
       <article class="card">
         <div class="top">
@@ -188,10 +318,43 @@
           <div class="fact">{{ booking.travellers }} traveller{{ '' if booking.travellers==1 else 's' }}<span>Guests</span></div>
           <div class="fact">{{ booking.price|npr }}<span>Total amount</span></div>
         </div>
-        {% if booking.status not in ('Cancelled', 'Cancel Requested') %}
-          <form method="post" action="{{ url_for('cancel_booking',booking_id=booking.id) }}" onsubmit="return confirm('Cancel this booking?')">
+        {% if booking.discount_amount %}
+          <p class="discount-note">🎉 First-booking discount applied: -{{ booking.discount_amount|npr }}</p>
+        {% endif %}
+        {% if booking.status == 'Confirmed' %}
+          {% if booking.payment_status == 'Paid' %}
+            <span class="status paid">Paid</span>
+            <div class="actions">
+              <a class="pay pay-esewa" href="{{ url_for('booking_ticket', booking_id=booking.id) }}">Download e-ticket</a>
+            </div>
+          {% else %}
+            <div class="actions">
+              <a class="pay pay-esewa" href="{{ url_for('pay_with_esewa', booking_id=booking.id) }}">Pay with eSewa (NPR)</a>
+              <a class="pay pay-stripe" href="{{ url_for('pay_with_stripe', booking_id=booking.id) }}">Pay with Card (USD)</a>
+            </div>
+          {% endif %}
+        {% endif %}
+        {% if booking.refund_status %}
+          <div class="refund-status {{ 'refund-refunded' if booking.refund_status=='Refunded' else 'refund-rejected' if booking.refund_status=='Rejected' else '' }}">
+            Cancellation &amp; refund request: <strong>{{ booking.refund_status }}</strong>
+            {% if booking.refund_status == 'Rejected' and booking.refund_admin_notes %}<span>Reason: {{ booking.refund_admin_notes }}</span>{% endif %}
+            {% if booking.refund_status == 'Refunded' %}<span>{{ booking.refund_amount|npr }} refunded{% if booking.refund_fee %} (after a {{ booking.refund_fee|npr }} cancellation fee){% endif %}{% if booking.refund_reference %} &middot; Reference: {{ booking.refund_reference }}{% endif %}</span>{% endif %}
+            {% if booking.refund_status in ('Requested', 'Approved', 'Refund Pending') %}<span>{{ booking.refund_amount|npr }} will be refunded (after a {{ booking.refund_fee|npr }} cancellation fee) once approved.</span>{% endif %}
+          </div>
+        {% endif %}
+        {% if booking.status not in ('Cancelled', 'Cancel Requested') and booking.payment_status != 'Paid' %}
+          <form method="post" action="{{ url_for('cancel_booking',booking_id=booking.id) }}" onsubmit="return confirm('Cancel this booking?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="cancel">Cancel booking</button>
           </form>
+        {% elif booking.status == 'Confirmed' and booking.payment_status == 'Paid' and (not booking.refund_status or booking.refund_status == 'Rejected') %}
+          <details class="refund-request">
+            <summary>Request cancellation &amp; refund</summary>
+            <form method="post" action="{{ url_for('cancel_booking',booking_id=booking.id) }}" onsubmit="return confirm('Submit a cancellation and refund request for this booking?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <p class="refund-fee-notice">A {{ cancellation_fee_percent }}% cancellation fee applies &mdash; you'll be refunded {{ (booking.price|float * (1 - cancellation_fee_percent / 100))|round|npr }} of your {{ booking.price|npr }} payment.</p>
+              <textarea name="reason" rows="2" required maxlength="2000" placeholder="Tell us why you'd like to cancel this booking"></textarea>
+              <button class="cancel" type="submit">Submit request</button>
+            </form>
+          </details>
         {% endif %}
       </article>
     {% else %}
@@ -202,7 +365,7 @@
       </div>
     {% endfor %}
 
-    <h2 style="margin-top:34px">Travel history</h2>
+    <h2 id="history" style="margin-top:34px">Travel history</h2>
     {% for booking in past_bookings %}
       <article class="card">
         <div class="top">
@@ -214,6 +377,40 @@
           <div class="fact">{{ booking.travellers }} traveller{{ '' if booking.travellers==1 else 's' }}<span>Guests</span></div>
           <div class="fact">{{ booking.price|npr }}<span>Total amount</span></div>
         </div>
+        {% if booking.discount_amount %}
+          <p class="discount-note">🎉 First-booking discount applied: -{{ booking.discount_amount|npr }}</p>
+        {% endif %}
+        {% if booking.status in ('Confirmed', 'Completed') and booking.payment_status == 'Paid' %}
+          <div class="actions">
+            <a class="pay pay-esewa" href="{{ url_for('booking_ticket', booking_id=booking.id) }}">Download e-ticket</a>
+          </div>
+        {% endif %}
+        {% if booking.refund_status %}
+          <div class="refund-status {{ 'refund-refunded' if booking.refund_status=='Refunded' else 'refund-rejected' if booking.refund_status=='Rejected' else '' }}">
+            Cancellation &amp; refund request: <strong>{{ booking.refund_status }}</strong>
+            {% if booking.refund_status == 'Rejected' and booking.refund_admin_notes %}<span>Reason: {{ booking.refund_admin_notes }}</span>{% endif %}
+            {% if booking.refund_status == 'Refunded' %}<span>{{ booking.refund_amount|npr }} refunded{% if booking.refund_fee %} (after a {{ booking.refund_fee|npr }} cancellation fee){% endif %}{% if booking.refund_reference %} &middot; Reference: {{ booking.refund_reference }}{% endif %}</span>{% endif %}
+          </div>
+        {% endif %}
+        {% if booking.status == 'Completed' and booking.package_id %}
+          <details class="review-box">
+            <summary>{{ 'Edit your review' if booking.review_id else 'Leave a review' }}</summary>
+            <form method="post" action="{{ url_for('submit_review', booking_id=booking.id) }}" class="review-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <label>Rating
+                <select name="rating" required>
+                  <option value="">Choose a rating</option>
+                  {% for n in range(5, 0, -1) %}
+                    <option value="{{ n }}" {% if booking.review_rating==n %}selected{% endif %}>{{ n }} star{{ '' if n==1 else 's' }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>Comment (optional)
+                <textarea name="comment" rows="3" maxlength="1000" placeholder="How was the trip?">{{ booking.review_comment or '' }}</textarea>
+              </label>
+              <button type="submit">{{ 'Update review' if booking.review_id else 'Submit review' }}</button>
+            </form>
+          </details>
+        {% endif %}
       </article>
     {% else %}
       <div class="empty">
@@ -226,5 +423,6 @@
   </div>
 </div>
 <script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+{% include "_ui_foot.html" %}
 </body>
 </html>

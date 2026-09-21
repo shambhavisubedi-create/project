@@ -101,6 +101,24 @@
       color: var(--w);
       font-weight: bold
     }
+    .terms-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      font-weight: 400;
+      font-size: 13px;
+      color: var(--m);
+      cursor: pointer
+    }
+    .terms-check input[type="checkbox"] {
+      width: auto;
+      margin: 3px 0 0;
+      flex-shrink: 0
+    }
+    .terms-check a {
+      color: var(--w);
+      font-weight: bold
+    }
     button {
       border: 0;
       background: var(--w);
@@ -123,6 +141,16 @@
       color: var(--m);
       font-size: 14px
     }
+    .first-booking-badge {
+      display: inline-block;
+      margin: 6px 0 !important;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: #e5f3ec !important;
+      color: #286650 !important;
+      font-size: 13px !important;
+      font-weight: 700
+    }
     @media(max-width:600px) {
       .grid {
         grid-template-columns: 1fr
@@ -131,6 +159,7 @@
   </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
 </head>
 <body>
 <div class="app-shell">
@@ -154,9 +183,16 @@
           <h2>{{ package.name }}</h2>
           <p>{{ package.duration_days }} days · {{ package.hotel_type|capitalize }} stay · {{ package.transport_mode|capitalize }}</p>
           <p><strong>{{ package.price|npr }}</strong> per traveller</p>
+          {% if is_first_booking %}
+            <p class="first-booking-badge">🎉 Welcome discount: {{ first_booking_discount_percent|round|int }}% off this booking, since it's your first with GoGather.</p>
+          {% endif %}
+          <p><small>{% if is_first_booking %}After a {{ first_booking_discount_percent|round|int }}% first-booking discount, plus {% else %}Plus a {% endif %}{{ service_fee_percent|round|int }}% GoGather service fee, added at checkout. Total for <span id="travellerCount">1</span> traveller(s): <strong id="totalEstimate">{{ (package.price * (1 - (first_booking_discount_percent if is_first_booking else 0) / 100) * (1 + service_fee_percent / 100))|npr }}</strong></small></p>
+          {% if package.max_seats %}
+            <p><small>Limited to {{ package.max_seats }} seats per departure date. If your chosen date is full, you'll be asked to pick another date or fewer travellers.</small></p>
+          {% endif %}
         </div>
       {% endif %}
-      <form method="post">
+      <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="grid">
           {% if not package %}
             <div class="full">
@@ -177,12 +213,18 @@
           </div>
           <div>
             <label>Number of travellers</label>
-            <input type="number" name="travellers" min="1" max="20" value="1" required>
+            <input type="number" name="travellers" id="travellersInput" min="1" max="20" value="1" required>
           </div>
           <div class="full">
             <label>Contact phone number</label>
             <input value="{{ traveller_phone }}" readonly>
             <small>This is the number on your <a href="{{ url_for('profile') }}">profile</a>. Update it there if it's changed.</small>
+          </div>
+          <div class="full">
+            <label class="terms-check">
+              <input type="checkbox" id="accept_policy" name="accept_policy" required>
+              <span>I accept the <a href="{{ url_for('terms') }}" target="_blank">Terms &amp; Conditions</a>, including the <a href="{{ url_for('terms') }}#refund" target="_blank">Refund Policy</a>, and the <a href="{{ url_for('privacy') }}" target="_blank">Privacy Policy</a>.</span>
+            </label>
           </div>
           <div class="full">
             <button type="submit">Confirm booking</button>
@@ -194,6 +236,27 @@
 
   </div>
 </div>
+{% if package %}
+<script>
+  (function () {
+    var pricePerTraveller = {{ package.price }};
+    var serviceFeePercent = {{ service_fee_percent }};
+    var discountPercent = {{ first_booking_discount_percent if is_first_booking else 0 }};
+    var travellersInput = document.getElementById('travellersInput');
+    var countLabel = document.getElementById('travellerCount');
+    var totalLabel = document.getElementById('totalEstimate');
+    if (!travellersInput || !countLabel || !totalLabel) return;
+    travellersInput.addEventListener('input', function () {
+      var travellers = Math.max(1, parseInt(travellersInput.value, 10) || 1);
+      var discounted = pricePerTraveller * travellers * (1 - discountPercent / 100);
+      var total = discounted * (1 + serviceFeePercent / 100);
+      countLabel.textContent = travellers;
+      totalLabel.textContent = 'Rs ' + Math.round(total).toLocaleString('en-US');
+    });
+  })();
+</script>
+{% endif %}
 <script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+{% include "_ui_foot.html" %}
 </body>
 </html>

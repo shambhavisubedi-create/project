@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Wishlist | GoGather</title>
+  <style>
+    :root {
+      --wine: #a9455c;
+      --wine-dark: #823246;
+      --ink: #2c2420;
+      --text: #51433d;
+      --muted: #82736b;
+      --cream: #fdf3ea;
+      --line: #eddfd4;
+      --card: #fffdfa
+    }
+    * {
+      box-sizing: border-box
+    }
+    body {
+      margin: 0;
+      background: var(--cream);
+      color: var(--text);
+      font-family: Segoe UI,Arial,sans-serif
+    }
+    .wrap {
+      max-width: 1180px;
+      margin: auto;
+      padding: 38px 24px 70px
+    }
+    .eyebrow {
+      color: var(--wine);
+      text-transform: uppercase;
+      letter-spacing: 1.6px;
+      font-weight: 700;
+      font-size: 11px
+    }
+    h1,h2 {
+      font-family: Georgia,serif;
+      color: var(--ink)
+    }
+    h1 {
+      font-size: clamp(28px,4vw,40px);
+      margin: 6px 0 6px
+    }
+    .intro {
+      max-width: 560px;
+      color: var(--muted);
+      margin: 0 0 22px
+    }
+    .flash {
+      padding: 12px;
+      border-radius: 9px;
+      margin: 18px 0;
+      background: #e5f3ec;
+      color: #286650
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3,1fr);
+      gap: 22px;
+      margin-top: 24px
+    }
+    .card {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--card);
+      padding: 23px;
+      box-shadow: 0 5px 18px rgba(67,41,29,.04);
+      display: flex;
+      flex-direction: column
+    }
+    .wish-form {
+      position: absolute;
+      top: 16px;
+      right: 16px
+    }
+    .wish-btn {
+      width: 36px;
+      height: 36px;
+      min-height: 0;
+      border-radius: 999px;
+      background: var(--wine);
+      color: #fff;
+      border: 1px solid var(--wine);
+      font-size: 16px;
+      padding: 0;
+      line-height: 1;
+      cursor: pointer
+    }
+    .tag {
+      color: var(--wine);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      font-size: 11px;
+      font-weight: 700
+    }
+    h2 {
+      font-size: 25px;
+      line-height: 1.15;
+      margin: 10px 0
+    }
+    .summary {
+      min-height: 64px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+      margin: 0
+    }
+    .facts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+      margin: 20px 0
+    }
+    .fact {
+      background: #f8ebe5;
+      border-radius: 8px;
+      padding: 9px;
+      color: #74414b;
+      font-size: 12px;
+      font-weight: 700
+    }
+    .fact span {
+      display: block;
+      color: #8c6a63;
+      font-size: 11px;
+      font-weight: 500;
+      margin-top: 3px
+    }
+    .price {
+      font: 700 26px Georgia,serif;
+      color: var(--ink);
+      margin-top: auto;
+      padding-top: 16px
+    }
+    .price small {
+      font: 500 12px Segoe UI,Arial;
+      color: var(--muted)
+    }
+    .details {
+      display: block;
+      text-align: center;
+      background: var(--wine);
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+      padding: 12px;
+      border-radius: 10px;
+      margin-top: 16px
+    }
+    .details:hover {
+      background: var(--wine-dark)
+    }
+    .empty {
+      grid-column: 1/-1;
+      text-align: center;
+      border: 1px dashed #d7bdb1;
+      border-radius: 18px;
+      padding: 54px;
+      color: var(--muted)
+    }
+    .empty a {
+      display: inline-block;
+      margin-top: 13px;
+      background: var(--wine);
+      padding: 10px 15px;
+      border-radius: 8px;
+      color: #fff;
+      font-weight: bold
+    }
+    @media(max-width:800px) {
+      .grid {
+        grid-template-columns: 1fr
+      }
+    }
+  </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
+</head>
+<body>
+<div class="app-shell">
+  {% include "_sidebar_traveller.html" %}
+  <div class="main">
+  {% set role_label = 'Traveller' %}
+  {% include "_topbar.html" %}
+
+  <main class="wrap">
+    <div class="eyebrow">Saved for later</div>
+    <h1>Wishlist</h1>
+    <p class="intro">Packages and places you've saved to look at again.</p>
+    {% with messages=get_flashed_messages(with_categories=true) %}
+      {% for c,m in messages %}
+        <div class="flash">{{ m }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <h2 style="margin:28px 0 4px">Saved packages</h2>
+    <section class="grid">
+      {% for package in packages %}
+        <article class="card" data-wish-card>
+          <form class="wish-form" data-remove-card method="post" action="{{ url_for('toggle_wishlist', package_id=package.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ url_for('wishlist') }}">
+            <button class="wish-btn" type="submit" title="Remove from wishlist">♥</button>
+          </form>
+          <div class="tag">{{ package.tag }}</div>
+          <h2>{{ package.name }}</h2>
+          <p class="summary">{{ package.summary }}</p>
+          <div class="facts">
+            <div class="fact">{{ package.duration_days }} days<span>Duration</span></div>
+            <div class="fact">{{ package.hotel_type|capitalize }}<span>Accommodation</span></div>
+            <div class="fact">{{ package.transport_mode|capitalize }}<span>Transport</span></div>
+            <div class="fact">{{ package.places|length }} stops<span>Places covered</span></div>
+          </div>
+          <div class="price">{{ package.price|npr }} <small>per traveller</small></div>
+          <a class="details" href="{{ url_for('package_detail',package_id=package.id) }}">View package details →</a>
+          <a class="details" href="{{ url_for('book_package', package_id=package.id) }}" style="font-weight:700">Book now →</a>
+        </article>
+      {% else %}
+        <div class="empty">
+          <h2>No saved packages yet.</h2>
+          <p>Save a package while browsing to find it here later.</p>
+          <a href="{{ url_for('packages') }}">Browse packages</a>
+        </div>
+      {% endfor %}
+    </section>
+
+    <h2 style="margin:34px 0 4px">Saved places</h2>
+    <section class="grid">
+      {% for place in places %}
+        <article class="card" data-wish-card>
+          <form class="wish-form" data-remove-card method="post" action="{{ url_for('toggle_place_wishlist', place_id=place.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ url_for('wishlist') }}">
+            <button class="wish-btn" type="submit" title="Remove from wishlist">♥</button>
+          </form>
+          <div class="tag">{{ place.category }}</div>
+          <h2>{{ place.name }}</h2>
+          <p class="summary">📍 {{ place.region }}</p>
+          <div class="facts">
+            <div class="fact">{{ place.days }}<span>Ideal stay</span></div>
+            <div class="fact">{{ place.budget }}<span>Budget</span></div>
+          </div>
+          <a class="details" href="{{ url_for('place_detail', slug=place.slug) }}">View destination guide →</a>
+          <a class="details" href="{{ url_for('place_detail', slug=place.slug) }}#packages" style="font-weight:700">Find packages →</a>
+        </article>
+      {% else %}
+        <div class="empty">
+          <h2>No saved places yet.</h2>
+          <p>Save a destination while browsing Explore Places to find it here later.</p>
+          <a href="{{ url_for('explore_places') }}">Explore places</a>
+        </div>
+      {% endfor %}
+    </section>
+  </main>
+
+  </div>
+</div>
+<script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+{% include "_ui_foot.html" %}
+</body>
+</html>

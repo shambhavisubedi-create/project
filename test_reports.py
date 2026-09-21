@@ -32,13 +32,27 @@ class ReportsTests(unittest.TestCase):
         self.assertIn(b'No bookings in this period', response.data)
         self.assertIn(b'Rs 0', response.data)
         with app.test_request_context():
-            html = app.jinja_env.get_template('admin_dashboard.html').render(featured_packages=[])
+            # admin_dashboard() has grown several more stat/list variables
+            # since this test was written -- the template now needs all of
+            # them present (even as zero/empty) to render without a Jinja
+            # error on an Undefined value.
+            html = app.jinja_env.get_template('admin_dashboard.html').render(
+                username='tester', featured_packages=[],
+                total_travellers=0, total_packages=0, total_bookings=0, total_groups=0,
+                total_revenue=0, gross_booking_value=0, margin_percent=0,
+                total_service_fees=0, total_cancellation_fees=0,
+                pending_bookings=0, cancel_requests=0, pending_groups=0, pending_group_members=0,
+                recent_travellers=[], traveller_performance=[],
+            )
         self.assertIn('href="/admin/reports"', html)
 
     def test_values_statuses_and_ranking(self):
         self.login()
-        bookings = [dict(package_name=name, price=Decimal(price), travellers=2,
-                         status=status, created_at=datetime.now()) for name, price, status in [
+        # payment_status and cost_price are both read by admin_reports() (for
+        # the paid-value/margin totals) even though this test only asserts
+        # on the status/value/ranking fields below.
+        bookings = [dict(package_name=name, price=Decimal(price), cost_price=Decimal('0'), travellers=2,
+                         status=status, payment_status='Unpaid', created_at=datetime.now()) for name, price, status in [
             ('Pokhara', '1000', 'Confirmed'), ('Pokhara', '2000', 'Completed'),
             ('Everest', '8000', 'Cancelled'), ('Everest', '9000', 'Pending'),
             ('Pokhara', '5000', 'Cancel Requested')]]

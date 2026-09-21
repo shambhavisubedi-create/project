@@ -29,12 +29,6 @@
       margin: auto;
       padding: 38px 24px 70px
     }
-    .hero {
-      background: linear-gradient(120deg,#f8dad6,#f7e7d8);
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      padding: 38px
-    }
     .eyebrow {
       color: var(--wine);
       text-transform: uppercase;
@@ -47,14 +41,13 @@
       color: var(--ink)
     }
     h1 {
-      font-size: clamp(34px,5vw,54px);
-      margin: 9px 0
+      font-size: clamp(28px,4vw,40px);
+      margin: 6px 0 6px
     }
-    .hero p {
-      max-width: 620px;
+    .intro {
+      max-width: 560px;
       color: var(--muted);
-      line-height: 1.65;
-      margin: 0
+      margin: 0 0 22px
     }
     .filter {
       margin: 28px 0 18px;
@@ -107,6 +100,7 @@
       gap: 22px
     }
     .card {
+      position: relative;
       border: 1px solid var(--line);
       border-radius: 18px;
       background: var(--card);
@@ -114,6 +108,28 @@
       box-shadow: 0 5px 18px rgba(67,41,29,.04);
       display: flex;
       flex-direction: column
+    }
+    .wish-form {
+      position: absolute;
+      top: 16px;
+      right: 16px
+    }
+    .wish-btn {
+      width: 36px;
+      height: 36px;
+      min-height: 0;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--wine);
+      font-size: 16px;
+      padding: 0;
+      line-height: 1;
+      cursor: pointer
+    }
+    .wish-btn.saved {
+      background: var(--wine);
+      color: #fff
     }
     .tag {
       color: var(--wine);
@@ -126,6 +142,16 @@
       font-size: 25px;
       line-height: 1.15;
       margin: 10px 0
+    }
+    .rating-badge {
+      color: #b8853f;
+      font-size: 13px;
+      font-weight: 700;
+      margin: -4px 0 6px
+    }
+    .rating-badge span {
+      color: var(--muted);
+      font-weight: 400
     }
     .summary {
       min-height: 64px;
@@ -187,17 +213,24 @@
       padding: 54px;
       color: var(--muted)
     }
+    .filter-more {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px
+    }
     @media(max-width:800px) {
       .filter,.grid {
         grid-template-columns: 1fr
       }
-      .hero {
-        padding: 28px
+      .filter-more {
+        grid-template-columns: 1fr 1fr
       }
     }
   </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+{% include "_ui_head.html" %}
 </head>
 <body>
 <div class="app-shell">
@@ -207,11 +240,9 @@
   {% include "_topbar.html" %}
 
   <main class="wrap">
-    <section class="hero">
-      <div class="eyebrow">Curated Nepal journeys</div>
-      <h1>Travel plans, ready when you are.</h1>
-      <p>Compare thoughtfully designed packages with clear durations, accommodation, transport, and prices. Open any package to see its itinerary highlights before booking.</p>
-    </section>
+    <div class="eyebrow">Curated Nepal journeys</div>
+    <h1>Travel Packages</h1>
+    <p class="intro">Compare packages by duration, accommodation, transport, and price.</p>
     <form class="filter" method="get">
       <input name="search" value="{{ search }}" placeholder="Search a package">
       <select name="hotel_type">
@@ -227,16 +258,36 @@
         {% endfor %}
       </select>
       <button type="submit">Find packages</button>
+      <div class="filter-more">
+        <input type="number" name="min_price" min="0" step="500" value="{{ min_price if min_price is not none else '' }}" placeholder="Min price (Rs)" aria-label="Minimum price">
+        <input type="number" name="max_price" min="0" step="500" value="{{ max_price if max_price is not none else '' }}" placeholder="Max price (Rs)" aria-label="Maximum price">
+        <select name="duration" aria-label="Trip length">
+          <option value="">Any length</option>
+          {% for key, item in duration_filters.items() %}
+            <option value="{{ key }}" {% if selected_duration==key %}selected{% endif %}>{{ item[2] }}</option>
+          {% endfor %}
+        </select>
+        <select name="sort" aria-label="Sort by">
+          {% for key, item in sort_options.items() %}
+            <option value="{{ key }}" {% if selected_sort==key %}selected{% endif %}>{{ item[0] }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </form>
     <div class="bar">
       <p>{{ packages|length }} package{{ '' if packages|length==1 else 's' }} available</p>
-      {% if search or selected_hotel or selected_transport %}<a class="clear" href="{{ url_for('packages') }}">Clear filters</a>{% endif %}
+      {% if search or selected_hotel or selected_transport or min_price is not none or max_price is not none or selected_duration or selected_sort != 'price_asc' %}<a class="clear" href="{{ url_for('packages') }}">Clear filters</a>{% endif %}
     </div>
     <section class="grid">
       {% for package in packages %}
         <article class="card">
+          <form class="wish-form" method="post" action="{{ url_for('toggle_wishlist', package_id=package.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <button class="wish-btn {{ 'saved' if package.id in wishlisted_ids else '' }}" type="submit" title="{{ 'Remove from wishlist' if package.id in wishlisted_ids else 'Save to wishlist' }}">{{ '♥' if package.id in wishlisted_ids else '♡' }}</button>
+          </form>
           <div class="tag">{{ package.tag }}</div>
           <h2>{{ package.name }}</h2>
+          {% if package.rating_avg %}<p class="rating-badge">★ {{ package.rating_avg }} <span>({{ package.review_count }} review{{ '' if package.review_count==1 else 's' }})</span></p>{% endif %}
           <p class="summary">{{ package.summary }}</p>
           <div class="facts">
             <div class="fact">{{ package.duration_days }} days<span>Duration</span></div>
@@ -259,5 +310,6 @@
   </div>
 </div>
 <script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
+{% include "_ui_foot.html" %}
 </body>
 </html>

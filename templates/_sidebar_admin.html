@@ -19,6 +19,18 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12"/><path d="M4 19h16"/><path d="M9 19v-6h6v6"/></svg>
       <span class="label">Bookings</span>
     </a>
+    <a href="{{ url_for('admin_refunds') }}" class="{{ 'active' if request.endpoint == 'admin_refunds' else '' }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18"/><path d="M7 15h4"/><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M16 3v4M8 3v4"/></svg>
+      <span class="label">Refunds</span>
+    </a>
+    <a href="{{ url_for('admin_cancellation_fees') }}" class="{{ 'active' if request.endpoint == 'admin_cancellation_fees' else '' }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+      <span class="label">Fee Revenue</span>
+    </a>
+    <a href="{{ url_for('admin_package_margins') }}" class="{{ 'active' if request.endpoint == 'admin_package_margins' else '' }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></svg>
+      <span class="label">Margin Revenue</span>
+    </a>
     <a href="{{ url_for('manage_places') }}" class="{{ 'active' if request.endpoint == 'manage_places' else '' }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>
       <span class="label">Places</span>
@@ -30,6 +42,15 @@
     <a href="{{ url_for('admin_reports') }}" class="{{ 'active' if request.endpoint == 'admin_reports' else '' }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="M7 19V9M12 19V5m5 14v-8"/></svg>
       <span class="label">Reports</span>
+    </a>
+    <a href="{{ url_for('admin_support') }}" class="{{ 'active' if request.endpoint == 'admin_support' else '' }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
+      <span class="label">Support</span>
+      {% if open_support_count|default(0) %}<span class="nav-badge">{{ open_support_count }}</span>{% endif %}
+    </a>
+    <a href="{{ url_for('admin_activity') }}" class="{{ 'active' if request.endpoint == 'admin_activity' else '' }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+      <span class="label">Activity</span>
     </a>
   </nav>
   <div class="sidebar-foot">
