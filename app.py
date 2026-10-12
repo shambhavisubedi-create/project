@@ -16,6 +16,8 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from dotenv import load_dotenv
 from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
+from urllib.parse import urlsplit
 from mysql.connector import IntegrityError
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas as pdf_canvas
@@ -62,6 +64,12 @@ app.config.update(
     # Refuse any request body over 8 MB before it's read into memory (the
     # largest legitimate upload is a 3 MB profile photo).
     MAX_CONTENT_LENGTH=8 * 1024 * 1024,
+    # A signed-in session ends after this long without any request (the
+    # cookie is refreshed on every request, so it's an idle timeout, not a
+    # hard cut-off). login() marks the session permanent so this applies.
+    PERMANENT_SESSION_LIFETIME=timedelta(
+        minutes=int(os.environ.get("SESSION_LIFETIME_MINUTES", "120"))
+    ),
 )
 
 # Behind nginx / a load balancer every request appears to come from the
@@ -129,7 +137,8 @@ app.jinja_env.filters["npr"] = format_npr
 # out of the box in dev -- swap for real merchant credentials via env vars
 # before going live.
 ESEWA_PRODUCT_CODE = os.environ.get("ESEWA_PRODUCT_CODE", "EPAYTEST")
-ESEWA_SECRET_KEY = os.environ.get("ESEWA_SECRET_KEY", "8gBm/:&EnhH.1/q")
+ESEWA_SANDBOX_SECRET = "8gBm/:&EnhH.1/q"  # eSewa's published test key -- public, so anyone can sign with it
+ESEWA_SECRET_KEY = os.environ.get("ESEWA_SECRET_KEY", ESEWA_SANDBOX_SECRET)
 ESEWA_FORM_URL = os.environ.get("ESEWA_FORM_URL", "https://rc-epay.esewa.com.np/api/epay/main/v2/form")
 ESEWA_STATUS_URL = os.environ.get("ESEWA_STATUS_URL", "https://rc.esewa.com.np/api/epay/transaction/status/")
 
@@ -152,6 +161,16 @@ def npr_to_usd_cents(npr_amount):
 def esewa_sign(message, secret_key):
     digest = hmac.new(secret_key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).digest()
     return base64.b64encode(digest).decode("utf-8")
+
+
+def esewa_is_trusted():
+    """eSewa's sandbox signing key is public, so when it's still in use anyone
+    could forge a 'payment complete' result. In production that is refused
+    unless ESEWA_ALLOW_SANDBOX=1 is set on purpose (e.g. a demo site that
+    only ever uses eSewa's test wallet and takes no real money)."""
+    if not IS_PRODUCTION or ESEWA_SECRET_KEY != ESEWA_SANDBOX_SECRET:
+        return True
+    return os.environ.get("ESEWA_ALLOW_SANDBOX") == "1"
 
 
 def ensure_package_columns():
@@ -310,6 +329,11 @@ def ensure_payment_columns():
         # percent) so the traveller's receipt and admin reporting keep
         # showing the real discount even if the percentage changes later.
         execute("ALTER TABLE bookings ADD COLUMN discount_amount DECIMAL(10, 2) NOT NULL DEFAULT 0")
+    if "eula_accepted_at" not in columns:
+        # When the traveller accepted the EULA for this booking's payment --
+        # kept per booking so there's a record of what was agreed to before
+        # money changed hands.
+        execute("ALTER TABLE bookings ADD COLUMN eula_accepted_at TIMESTAMP NULL")
 
 
 def ensure_group_columns():
@@ -1492,6 +1516,7 @@ def run_schema_migrations():
     ensure_support_tickets_table()
     ensure_booking_reminder_column()
     ensure_password_reset_table()
+    ensure_login_attempts_table()
 
 
 @app.before_request
@@ -1578,8 +1603,32 @@ def inject_notifications():
 
 
 # SECURITY HEADERS
+def _origin_of(url):
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}" if parts.scheme and parts.netloc else ""
+
+
+# Content-Security-Policy. The templates still use inline <script>/<style>
+# blocks, so 'unsafe-inline' is kept for those -- but scripts can only be
+# loaded from this site and Highcharts, nothing can be embedded as a plugin,
+# <base> can't be hijacked, and forms can only post to this site or eSewa.
+CONTENT_SECURITY_POLICY = "; ".join([
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://code.highcharts.com",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'none'",
+    "form-action 'self' " + (_origin_of(ESEWA_FORM_URL) or "https://rc-epay.esewa.com.np"),
+])
+
+
 @app.after_request
 def add_security_headers(response):
+    response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
@@ -1657,7 +1706,22 @@ def robots_txt():
 
 @app.route("/favicon.ico")
 def favicon():
-    return redirect(url_for("static", filename="favicon.svg"), code=301)
+    return redirect(url_for("static", filename="favicon.png"), code=301)
+
+
+# PASSWORD STRENGTH
+# Same rule everywhere a password is set (register, reset, change) --
+# mirrors the client-side pattern in register.html so the server can't be
+# tricked into accepting a weaker password than the form allows.
+PASSWORD_PATTERN = re.compile(r"(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}")
+PASSWORD_REQUIREMENTS_MESSAGE = (
+    "Password must be at least 8 characters long and contain an uppercase letter, "
+    "lowercase letter, number, and special character."
+)
+
+
+def is_strong_password(password):
+    return bool(PASSWORD_PATTERN.fullmatch(password or ""))
 
 
 # SAFE REDIRECTS
@@ -1668,6 +1732,17 @@ def safe_next(target, fallback):
     if target and target.startswith("/") and not target.startswith("//") and "\\" not in target:
         return target
     return fallback
+
+
+def redirect_to_login():
+    """Sends a signed-out visitor to the login page. For a page reached
+    directly -- a bookmark, a shared link, or a session that simply timed
+    out -- this remembers where they were headed (GET requests only) so
+    login() can send them back there instead of always landing on the
+    generic dashboard."""
+    if request.method == "GET":
+        return redirect(url_for("login", next=request.full_path.rstrip("?")))
+    return redirect(url_for("login"))
 
 
 # RATE LIMITING
@@ -1721,37 +1796,94 @@ def terms():
 # LOGIN ATTEMPT THROTTLING
 # Keyed by username+IP so one person mistyping their own password doesn't
 # lock out everyone else on the same network, and so guessing many usernames
-# from one IP is still slowed down. In-memory only -- resets if the app
-# restarts, which is fine for a single dev-server process; a real deployment
-# with multiple worker processes would need this in the database instead.
+# from one IP is still slowed down. Counts are kept in the database
+# (login_attempts table) so a lockout survives an app
+# restart and is shared by every worker process. If the database can't be
+# reached the in-memory dict below takes over, so a DB hiccup never turns
+# into "nobody can log in".
 LOGIN_ATTEMPT_LIMIT = 5
 LOGIN_LOCKOUT_SECONDS = 300
 
-_login_attempts = {}
+_login_attempts = {}  # fallback only -- see above
+_login_table_ready = False
+
+
+def ensure_login_attempts_table():
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS login_attempts (
+            throttle_key VARCHAR(190) NOT NULL PRIMARY KEY,
+            failed_count INT NOT NULL DEFAULT 0,
+            locked_until DATETIME NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+
+def _prepare_login_attempts():
+    # Login is the one page that runs before run_schema_migrations() (which
+    # waits for a signed-in user), so this table is created on first use.
+    global _login_table_ready
+    if not _login_table_ready:
+        ensure_login_attempts_table()
+        _login_table_ready = True
 
 
 def _login_throttle_key(username):
-    return f"{username.strip().lower()}:{request.remote_addr}"
+    return f"{username.strip().lower()}:{request.remote_addr}"[:190]
 
 
 def _login_locked_seconds_left(key):
-    entry = _login_attempts.get(key)
-    if not entry or not entry["locked_until"]:
-        return 0
-    remaining = entry["locked_until"] - time.time()
-    return int(remaining) if remaining > 0 else 0
+    try:
+        _prepare_login_attempts()
+        row = query(
+            "SELECT TIMESTAMPDIFF(SECOND, NOW(), locked_until) AS remaining "
+            "FROM login_attempts WHERE throttle_key = %s AND locked_until IS NOT NULL",
+            (key,), fetch="one",
+        )
+        return max(int(row["remaining"]), 0) if row and row["remaining"] is not None else 0
+    except Exception:
+        app.logger.warning("Login throttle: database unavailable, using in-memory fallback", exc_info=True)
+        entry = _login_attempts.get(key)
+        if not entry or not entry["locked_until"]:
+            return 0
+        remaining = entry["locked_until"] - time.time()
+        return int(remaining) if remaining > 0 else 0
 
 
 def _register_failed_login(key):
-    entry = _login_attempts.setdefault(key, {"count": 0, "locked_until": 0})
-    entry["count"] += 1
-    if entry["count"] >= LOGIN_ATTEMPT_LIMIT:
-        entry["locked_until"] = time.time() + LOGIN_LOCKOUT_SECONDS
-        entry["count"] = 0
+    try:
+        _prepare_login_attempts()
+        # locked_until is assigned before failed_count on purpose: MySQL
+        # applies ON DUPLICATE KEY assignments left to right, and the lock
+        # decision has to see the count from before this failure is added.
+        execute(
+            """
+            INSERT INTO login_attempts (throttle_key, failed_count) VALUES (%s, 1)
+            ON DUPLICATE KEY UPDATE
+                locked_until = IF(failed_count + 1 >= %s,
+                                  DATE_ADD(NOW(), INTERVAL %s SECOND), locked_until),
+                failed_count = IF(failed_count + 1 >= %s, 0, failed_count + 1)
+            """,
+            (key, LOGIN_ATTEMPT_LIMIT, LOGIN_LOCKOUT_SECONDS, LOGIN_ATTEMPT_LIMIT),
+        )
+    except Exception:
+        app.logger.warning("Login throttle: database unavailable, using in-memory fallback", exc_info=True)
+        entry = _login_attempts.setdefault(key, {"count": 0, "locked_until": 0})
+        entry["count"] += 1
+        if entry["count"] >= LOGIN_ATTEMPT_LIMIT:
+            entry["locked_until"] = time.time() + LOGIN_LOCKOUT_SECONDS
+            entry["count"] = 0
 
 
 def _clear_login_attempts(key):
     _login_attempts.pop(key, None)
+    try:
+        _prepare_login_attempts()
+        execute("DELETE FROM login_attempts WHERE throttle_key = %s", (key,))
+    except Exception:
+        app.logger.warning("Login throttle: could not clear attempts", exc_info=True)
 
 
 # LOGIN PAGE
@@ -1760,6 +1892,7 @@ def _clear_login_attempts(key):
 def login():
 
     error = None
+    next_url = safe_next(request.values.get("next"), "")
 
     if request.method == "POST":
 
@@ -1773,7 +1906,7 @@ def login():
                 f"Too many failed login attempts. Please try again in "
                 f"{locked_seconds // 60 + 1} minute(s)."
             )
-            return render_template("login.html", error=error)
+            return render_template("login.html", error=error, next_url=next_url)
 
         # The form accepts either a username or email address.
         logged_in_user = query(
@@ -1795,6 +1928,13 @@ def login():
 
             _clear_login_attempts(throttle_key)
 
+            # Start from a clean session so nothing from before login (a
+            # pre-login CSRF token, a pending "next" value) is carried over,
+            # then re-issue a CSRF token and apply the idle timeout.
+            session.clear()
+            session["csrf_token"] = secrets.token_hex(32)
+            session.permanent = True
+
             # Store login information
             session["user_id"] = logged_in_user["id"]
             session["username"] = logged_in_user["username"]
@@ -1804,18 +1944,14 @@ def login():
 
             if logged_in_user["role"] == 0:
 
-                return redirect(
-                    url_for("dashboard")
-                )
+                return redirect(next_url or url_for("dashboard"))
 
-            
+
             # USER = 1 → ADMIN
 
             elif logged_in_user["role"] == 1:
 
-                return redirect(
-                    url_for("admin_dashboard")
-                )
+                return redirect(next_url or url_for("admin_dashboard"))
 
         # LOGIN FAILED
 
@@ -1826,7 +1962,8 @@ def login():
 
     return render_template(
         "login.html",
-        error=error
+        error=error,
+        next_url=next_url,
     )
 
 
@@ -1894,11 +2031,11 @@ def register():
 
             error = "Password and Confirm Password don't match."
 
-        # PASSWORD LENGTH
+        # PASSWORD STRENGTH
 
-        elif len(password) < 8:
+        elif not is_strong_password(password):
 
-            error = "Password must be at least 8 characters long."
+            error = PASSWORD_REQUIREMENTS_MESSAGE
 
         # PHONE FORMAT
 
@@ -1952,7 +2089,7 @@ def register():
 
             else:
 
-                return redirect(url_for("login"))
+                return redirect_to_login()
 
     return render_template(
         "register.html",
@@ -2080,9 +2217,9 @@ def verify_otp():
 
             error = "Password and Confirm Password don't match."
 
-        elif len(password) < 8:
+        elif not is_strong_password(password):
 
-            error = "Password must be at least 8 characters long."
+            error = PASSWORD_REQUIREMENTS_MESSAGE
 
         else:
 
@@ -2096,7 +2233,7 @@ def verify_otp():
             )
 
             flash("Your password has been reset. You can now log in.", "success")
-            return redirect(url_for("login"))
+            return redirect_to_login()
 
     return render_template("verify_otp.html", error=error, phone=phone)
 
@@ -2302,7 +2439,7 @@ def dashboard():
 def traveller_reports():
 
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
@@ -2555,7 +2692,7 @@ def list_static_images():
 @app.route("/admin/places", methods=["GET", "POST"])
 def manage_places():
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 1:
         return redirect(url_for("dashboard"))
 
@@ -2635,7 +2772,7 @@ def manage_places():
 def add_place_photo(slug):
 
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     place = query("SELECT id, name FROM explore_places WHERE slug = %s", (slug,), fetch="one")
     image = request.form.get("image", "")
@@ -2666,7 +2803,7 @@ def add_place_photo(slug):
 def delete_place_photo(slug, photo_id):
 
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     place = query("SELECT id, name FROM explore_places WHERE slug = %s", (slug,), fetch="one")
     if place is None:
@@ -2871,7 +3008,7 @@ def get_package_departure_info(package_id):
 @app.route("/packages/<int:package_id>")
 def package_detail(package_id):
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
@@ -2912,7 +3049,7 @@ def package_detail(package_id):
 @app.route("/packages/<int:package_id>/itinerary")
 def package_itinerary_page(package_id):
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
@@ -2955,7 +3092,7 @@ def get_wishlisted_place_ids(user_id):
 @app.route("/wishlist")
 def wishlist():
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
@@ -3010,7 +3147,7 @@ def wishlist_response(saved, message, next_url):
 @app.route("/wishlist/<int:package_id>/toggle", methods=["POST"])
 def toggle_wishlist(package_id):
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
@@ -3035,7 +3172,7 @@ def toggle_wishlist(package_id):
 @app.route("/wishlist/place/<int:place_id>/toggle", methods=["POST"])
 def toggle_place_wishlist(place_id):
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
@@ -3085,7 +3222,7 @@ def package_search_term(place):
 def explore_places():
 
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     # Only traveller can access this page
     if session.get("user") != 0:
@@ -3136,7 +3273,7 @@ def explore_places():
 @app.route("/explore_places/<slug>")
 def place_detail(slug):
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
@@ -3172,7 +3309,7 @@ def place_detail(slug):
 @app.route("/explore_places/<slug>/itinerary")
 def place_itinerary_page(slug):
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
@@ -3283,7 +3420,7 @@ def seats_booked_for_date(package_id, travel_date):
 def book_package():
 
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
@@ -3422,7 +3559,11 @@ def book_package():
     return render_template(
         "book_package.html",
         package=package,
-        packages=query("SELECT id, name, duration_days, price FROM packages ORDER BY price"),
+        packages=query(
+            "SELECT id, name, duration_days, hotel_type, transport_mode, price, tag, summary, max_seats, "
+            "(SELECT image FROM package_photos WHERE package_id = packages.id ORDER BY sort_order, id LIMIT 1) AS cover "
+            "FROM packages ORDER BY price"
+        ) if package is None else [],
         today=date.today().isoformat(),
         max_travel_date=max_travel_date,
         traveller_phone=traveller_phone,
@@ -3439,7 +3580,7 @@ def book_package():
 def my_bookings():
 
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
@@ -3487,7 +3628,7 @@ def my_bookings():
 def cancel_booking(booking_id):
 
     if "user_id" not in session or session.get("user") != 0:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     booking = query(
         "SELECT id, status, payment_status, package_name, price FROM bookings WHERE id = %s AND user_id = %s",
@@ -3643,7 +3784,7 @@ def get_package_rating_summary():
 def submit_review(booking_id):
 
     if "user_id" not in session or session.get("user") != 0:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     booking = query(
         "SELECT id, package_id, status FROM bookings WHERE id = %s AND user_id = %s",
@@ -3687,7 +3828,7 @@ def submit_review(booking_id):
 def delete_review(review_id):
 
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     review = query("SELECT id, package_id FROM package_reviews WHERE id = %s", (review_id,), fetch="one")
     if review is None:
@@ -3704,7 +3845,7 @@ def delete_review(review_id):
 def booking_ticket(booking_id):
 
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
@@ -3739,7 +3880,8 @@ def booking_ticket(booking_id):
 
 def get_payable_booking(booking_id):
     booking = query(
-        "SELECT id, user_id, package_name, price, status, payment_status FROM bookings WHERE id = %s AND user_id = %s",
+        "SELECT id, user_id, package_name, price, status, payment_status, eula_accepted_at "
+        "FROM bookings WHERE id = %s AND user_id = %s",
         (booking_id, session["user_id"]), fetch="one",
     )
     if not booking or booking["status"] != "Confirmed" or booking["payment_status"] == "Paid":
@@ -3747,14 +3889,50 @@ def get_payable_booking(booking_id):
     return booking
 
 
-@app.route("/pay/esewa/<int:booking_id>")
-def pay_with_esewa(booking_id):
+@app.route("/pay/<int:booking_id>/agreement", methods=["GET", "POST"])
+def payment_agreement(booking_id):
+    """EULA gate: the traveller must accept it before being sent to eSewa/Stripe."""
     if "user_id" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     booking = get_payable_booking(booking_id)
     if booking is None:
         abort(404)
+
+    method = request.values.get("method", "")
+    if method not in ("esewa", "stripe"):
+        abort(404)
+
+    if request.method == "POST":
+        if request.form.get("accept_eula") != "on":
+            flash("You must accept the End-User License Agreement to continue with payment.", "error")
+        else:
+            execute("UPDATE bookings SET eula_accepted_at = NOW() WHERE id = %s", (booking_id,))
+            return redirect(url_for("pay_with_esewa" if method == "esewa" else "pay_with_stripe", booking_id=booking_id))
+
+    return render_template(
+        "eula.html",
+        booking=booking,
+        method=method,
+        cancellation_fee_percent=CANCELLATION_FEE_PERCENT,
+        service_fee_percent=SERVICE_FEE_PERCENT,
+    )
+
+
+@app.route("/pay/esewa/<int:booking_id>")
+def pay_with_esewa(booking_id):
+    if "user_id" not in session:
+        return redirect_to_login()
+
+    if not esewa_is_trusted():
+        flash("eSewa payments are not available right now. Please use card payment or contact support.", "error")
+        return redirect(url_for("my_bookings"))
+
+    booking = get_payable_booking(booking_id)
+    if booking is None:
+        abort(404)
+    if not booking["eula_accepted_at"]:
+        return redirect(url_for("payment_agreement", booking_id=booking_id, method="esewa"))
 
     transaction_uuid = f"gogather-{booking_id}-{int(time.time())}"
     message = (
@@ -3788,10 +3966,16 @@ def pay_with_esewa(booking_id):
 @app.route("/esewa/success")
 def esewa_success():
     if "user_id" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
+
+    if not esewa_is_trusted():
+        flash("eSewa payments are not available right now.", "error")
+        return redirect(url_for("my_bookings"))
 
     try:
         payload = json.loads(base64.b64decode(request.args.get("data", "")))
+        if not isinstance(payload, dict):
+            raise ValueError("unexpected payload")
     except (ValueError, TypeError):
         flash("Payment could not be verified.", "error")
         return redirect(url_for("my_bookings"))
@@ -3805,26 +3989,46 @@ def esewa_success():
 
     # Never trust the redirect at face value -- recompute the signature
     # ourselves before treating this as a real payment result.
-    if not signed_fields or esewa_sign(expected_message, ESEWA_SECRET_KEY) != payload.get("signature"):
+    if not signed_fields or not hmac.compare_digest(
+        esewa_sign(expected_message, ESEWA_SECRET_KEY), str(payload.get("signature", ""))
+    ):
         flash("Payment could not be verified.", "error")
         return redirect(url_for("my_bookings"))
 
-    status = requests.get(
-        ESEWA_STATUS_URL,
-        params={
-            "product_code": payload.get("product_code"),
-            "total_amount": payload.get("total_amount"),
-            "transaction_uuid": payload.get("transaction_uuid"),
-        },
-        timeout=10,
-    ).json()
+    try:
+        status = requests.get(
+            ESEWA_STATUS_URL,
+            params={
+                "product_code": payload.get("product_code"),
+                "total_amount": payload.get("total_amount"),
+                "transaction_uuid": payload.get("transaction_uuid"),
+            },
+            timeout=10,
+        ).json()
+    except (requests.RequestException, ValueError):
+        app.logger.warning("eSewa status check failed", exc_info=True)
+        flash("We couldn't reach eSewa to confirm your payment. If you were charged, please contact support.", "error")
+        return redirect(url_for("my_bookings"))
 
     booking = query(
-        "SELECT id, user_id, package_name FROM bookings WHERE transaction_uuid = %s",
+        "SELECT id, user_id, package_name, price FROM bookings WHERE transaction_uuid = %s",
         (payload.get("transaction_uuid"),), fetch="one",
     )
 
-    if status.get("status") == "COMPLETE" and booking:
+    # The amount eSewa says was paid must be what this booking costs, and it
+    # must be our merchant account that took it -- a valid payment for some
+    # other amount or product can't settle this booking.
+    amount_matches = False
+    if booking:
+        try:
+            paid = Decimal(str(payload.get("total_amount", "")).replace(",", ""))
+            amount_matches = paid == Decimal(str(booking["price"]))
+        except InvalidOperation:
+            amount_matches = False
+    if payload.get("product_code") != ESEWA_PRODUCT_CODE:
+        amount_matches = False
+
+    if status.get("status") == "COMPLETE" and booking and amount_matches:
         execute("UPDATE bookings SET payment_status = 'Paid' WHERE id = %s", (booking["id"],))
         notify(
             booking["user_id"], f"Payment received for booking #{booking['id']} ({booking['package_name']}).",
@@ -3846,11 +4050,13 @@ def esewa_failure():
 @app.route("/pay/stripe/<int:booking_id>")
 def pay_with_stripe(booking_id):
     if "user_id" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     booking = get_payable_booking(booking_id)
     if booking is None:
         abort(404)
+    if not booking["eula_accepted_at"]:
+        return redirect(url_for("payment_agreement", booking_id=booking_id, method="stripe"))
 
     traveller = query("SELECT email FROM users WHERE id = %s", (session["user_id"],), fetch="one")
 
@@ -3889,6 +4095,13 @@ def stripe_success():
 
 @app.route("/webhooks/stripe", methods=["POST"])
 def stripe_webhook():
+    # With no webhook secret configured, a signature can be computed by
+    # anyone (HMAC with an empty key), so nothing would be authenticated.
+    # Refuse every call until the secret is set.
+    if not STRIPE_WEBHOOK_SECRET:
+        app.logger.error("Stripe webhook called but STRIPE_WEBHOOK_SECRET is not set; rejecting")
+        return "", 503
+
     payload = request.get_data()
     sig_header = request.headers.get("Stripe-Signature", "")
 
@@ -3899,7 +4112,10 @@ def stripe_webhook():
 
     if event["type"] == "checkout.session.completed":
         session_obj = event["data"]["object"]
-        booking_id = session_obj["metadata"]["booking_id"]
+        booking_id = (session_obj.get("metadata") or {}).get("booking_id")
+        # Only a session Stripe actually collected money for settles a booking.
+        if not booking_id or session_obj.get("payment_status") != "paid":
+            return "", 200
         booking = query(
             "SELECT id, user_id, package_name FROM bookings WHERE id = %s AND stripe_session_id = %s",
             (booking_id, session_obj["id"]), fetch="one",
@@ -3920,7 +4136,7 @@ MAX_GROUP_DAYS_AHEAD = 180
 def travel_groups():
 
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
@@ -3968,7 +4184,7 @@ def travel_groups():
 @app.route("/travel_groups/create", methods=["POST"])
 def create_travel_group():
     if "user_id" not in session or session.get("user") != 0:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     name = request.form.get("name", "").strip()
     destination = request.form.get("destination", "").strip()
@@ -4015,7 +4231,7 @@ def create_travel_group():
 @app.route("/travel_groups/<int:group_id>/join", methods=["POST"])
 def join_travel_group(group_id):
     if "user_id" not in session or session.get("user") != 0:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     group = query(
         """SELECT tg.name, tg.max_members, tg.travel_date, tg.status,
@@ -4060,10 +4276,48 @@ def join_travel_group(group_id):
 # communication_mode: 2 = two-way (any confirmed member can post),
 # 1 = one-way (only the group creator can post), 0 = blocked (no one can).
 
+def get_chat_list(user_id):
+    """Every group the user can chat in (creator or confirmed member), newest
+    activity first, each with a preview of its latest message."""
+    chats = query(
+        """
+        SELECT g.id, g.name, g.destination,
+               (SELECT m.message FROM group_messages m WHERE m.group_id = g.id ORDER BY m.id DESC LIMIT 1) AS last_message,
+               (SELECT m.created_at FROM group_messages m WHERE m.group_id = g.id ORDER BY m.id DESC LIMIT 1) AS last_at,
+               (SELECT u.full_name FROM group_messages m JOIN users u ON u.id = m.user_id
+                 WHERE m.group_id = g.id ORDER BY m.id DESC LIMIT 1) AS last_sender
+        FROM travel_groups g
+        WHERE g.created_by = %s
+           OR g.id IN (SELECT group_id FROM group_members WHERE user_id = %s AND status = 'Confirmed')
+        ORDER BY last_at IS NULL, last_at DESC, g.name ASC
+        """,
+        (user_id, user_id),
+    )
+    today = date.today()
+    for chat in chats:
+        last_at = chat["last_at"]
+        if last_at is None:
+            chat["last_label"] = ""
+        elif last_at.date() == today:
+            chat["last_label"] = last_at.strftime("%I:%M %p").lstrip("0")
+        elif (today - last_at.date()).days == 1:
+            chat["last_label"] = "Yesterday"
+        else:
+            chat["last_label"] = last_at.strftime("%d/%m/%Y")
+    return chats
+
+
+@app.route("/chats")
+def chats():
+    if "user_id" not in session or session.get("user") != 0:
+        return redirect_to_login()
+    return render_template("group_chat.html", group=None, chat_list=get_chat_list(session["user_id"]))
+
+
 @app.route("/travel_groups/<int:group_id>/chat", methods=["GET", "POST"])
 def group_chat(group_id):
     if "user_id" not in session or session.get("user") != 0:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     group = query(
         "SELECT id, name, destination, description, created_by, communication_mode FROM travel_groups WHERE id = %s",
@@ -4131,6 +4385,7 @@ def group_chat(group_id):
         members=members,
         can_post=can_post,
         is_creator=is_creator,
+        chat_list=get_chat_list(session["user_id"]),
     )
 
 
@@ -4175,6 +4430,7 @@ def group_chat_poll(group_id):
         {
             "id": row["id"],
             "is_own": row["user_id"] == session["user_id"],
+            "user_id": row["user_id"],
             "full_name": row["full_name"],
             "message": row["message"],
             "time": row["created_at"].strftime("%I:%M %p"),
@@ -4186,7 +4442,7 @@ def group_chat_poll(group_id):
 @app.route("/travel_groups/<int:group_id>/leave", methods=["POST"])
 def leave_travel_group(group_id):
     if "user_id" not in session or session.get("user") != 0:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     group = query("SELECT id, name, created_by FROM travel_groups WHERE id = %s", (group_id,), fetch="one")
     if group is None:
@@ -4217,7 +4473,7 @@ def leave_travel_group(group_id):
 def admin_travel_groups():
 
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     if session.get("user") != 1:
         return redirect(url_for("dashboard"))
@@ -4273,7 +4529,7 @@ def admin_travel_groups():
 def update_group_status(group_id):
 
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     status = request.form.get("status", "")
 
@@ -4297,7 +4553,7 @@ def update_group_status(group_id):
 def update_group_communication(group_id):
 
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     try:
         mode = int(request.form.get("communication_mode", ""))
@@ -4322,7 +4578,7 @@ def update_group_communication(group_id):
 def update_group_member_status(member_id):
 
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     status = request.form.get("status", "")
 
@@ -4361,10 +4617,24 @@ def avatar_extension(filename):
     return ext if ext in AVATAR_EXTENSIONS else None
 
 
+def detect_image_type(data):
+    """The real image format from the file's first bytes, or None. The
+    filename is user-controlled, so only the content is trusted -- a renamed
+    HTML/script file won't pass as a PNG."""
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "jpg"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "webp"
+    return None
+
+
 def save_avatar(user_id, filename, data):
     """Saves each upload under a unique name (avatar_<user_id>_<timestamp>.<ext>)
-    so previous avatars stay on the server instead of being deleted."""
-    ext = avatar_extension(filename)
+    so previous avatars stay on the server instead of being deleted. The
+    extension comes from the detected image type, not the uploaded filename."""
+    ext = detect_image_type(data) or avatar_extension(filename)
     avatar_dir = Path(app.static_folder) / "uploads" / "avatars"
     avatar_dir.mkdir(parents=True, exist_ok=True)
     timestamp = int(time.time() * 1000)
@@ -4416,7 +4686,7 @@ def ensure_avatar_history_table():
 def profile():
 
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
@@ -4441,6 +4711,10 @@ def profile():
         elif avatar_data is not None and len(avatar_data) > MAX_AVATAR_SIZE:
 
             flash("Please upload an image under 3 MB.", "error")
+
+        elif avatar_data is not None and detect_image_type(avatar_data) is None:
+
+            flash("That file isn't a valid PNG, JPG or WEBP image.", "error")
 
         else:
 
@@ -4495,7 +4769,7 @@ def profile():
 def restore_avatar(history_id):
 
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
@@ -4520,7 +4794,7 @@ def restore_avatar(history_id):
 def change_password():
 
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
@@ -4543,9 +4817,9 @@ def change_password():
 
         flash("New password and Confirm Password don't match.", "error")
 
-    elif len(new_password) < 8:
+    elif not is_strong_password(new_password):
 
-        flash("Your new password must be at least 8 characters long.", "error")
+        flash(PASSWORD_REQUIREMENTS_MESSAGE, "error")
 
     elif current_password == new_password:
 
@@ -4569,7 +4843,7 @@ def manage_travellers():
     # User must be logged in
     if "username" not in session:
 
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     # Only Admin can access this page
     if session.get("user") != 1:
@@ -4652,7 +4926,7 @@ def manage_travellers():
 def update_traveller(user_id):
 
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     full_name = request.form.get("full_name", "").strip()
     email = request.form.get("email", "").strip()
@@ -4689,7 +4963,7 @@ def update_traveller(user_id):
 def delete_traveller(user_id):
 
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     # Bookings, group memberships and groups they created are all set to
     # cascade in the database, so removing the traveller cleans those up too.
@@ -4854,7 +5128,7 @@ def admin_packages():
 def update_package(package_id):
 
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     name = request.form.get("name", "").strip()
     hotel_type = request.form.get("hotel_type", "")
@@ -4902,7 +5176,7 @@ def update_package(package_id):
 def delete_package(package_id):
 
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     # Bookings that referenced this package keep their own copy of the
     # package name and price, so they're unaffected (packages.id is set
@@ -4925,7 +5199,7 @@ MAX_PHOTOS_PER_ITEM = 12
 def add_package_photo(package_id):
 
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     package = query("SELECT name FROM packages WHERE id = %s", (package_id,), fetch="one")
     image = request.form.get("image", "")
@@ -4955,7 +5229,7 @@ def add_package_photo(package_id):
 def delete_package_photo(package_id, photo_id):
 
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     package = query("SELECT name FROM packages WHERE id = %s", (package_id,), fetch="one")
     execute("DELETE FROM package_photos WHERE id = %s AND package_id = %s", (photo_id, package_id))
@@ -4974,7 +5248,7 @@ def delete_package_photo(package_id, photo_id):
 @app.route("/admin/packages/<int:package_id>/itinerary/add-day", methods=["POST"])
 def add_package_itinerary_day(package_id):
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     package = query("SELECT name, duration_days FROM packages WHERE id = %s", (package_id,), fetch="one")
     title = request.form.get("title", "").strip()[:150]
@@ -5004,7 +5278,7 @@ def add_package_itinerary_day(package_id):
 @app.route("/admin/packages/<int:package_id>/itinerary/<int:day_id>/delete", methods=["POST"])
 def delete_package_itinerary_day(package_id, day_id):
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     execute("DELETE FROM package_itinerary_days WHERE id = %s AND package_id = %s", (day_id, package_id))
     flash("Itinerary day removed.", "success")
@@ -5015,7 +5289,7 @@ def delete_package_itinerary_day(package_id, day_id):
 @app.route("/admin/packages/<int:package_id>/itinerary/<int:day_id>/add-activity", methods=["POST"])
 def add_package_itinerary_activity(package_id, day_id):
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     activity_time = request.form.get("activity_time", "").strip()[:10]
     activity = request.form.get("activity", "").strip()[:255]
@@ -5039,7 +5313,7 @@ def add_package_itinerary_activity(package_id, day_id):
 @app.route("/admin/packages/<int:package_id>/itinerary/activity/<int:activity_id>/delete", methods=["POST"])
 def delete_package_itinerary_activity(package_id, activity_id):
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     execute(
         """
@@ -5057,7 +5331,7 @@ def delete_package_itinerary_activity(package_id, activity_id):
 @app.route("/admin/packages/<int:package_id>/itinerary/extras", methods=["POST"])
 def update_package_itinerary_extras(package_id):
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     packing_list = [item.strip() for item in request.form.get("packing_list", "").split(",") if item.strip()]
     things_to_know = [item.strip() for item in request.form.get("things_to_know", "").split(",") if item.strip()]
@@ -5091,7 +5365,7 @@ def admin_bookings():
     # User must be logged in
     if "username" not in session:
 
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     # Only Admin can access this page
     if session.get("user") != 1:
@@ -5189,7 +5463,7 @@ def admin_bookings():
 def update_booking_status(booking_id):
 
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     status = request.form.get("status", "")
     search = request.form.get("search", "")
@@ -5232,7 +5506,7 @@ def update_booking_status(booking_id):
 def admin_refunds():
 
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 1:
         return redirect(url_for("dashboard"))
 
@@ -5292,7 +5566,7 @@ def admin_refunds():
 def admin_package_margins():
 
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 1:
         return redirect(url_for("dashboard"))
 
@@ -5337,7 +5611,7 @@ def admin_package_margins():
 def admin_cancellation_fees():
 
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 1:
         return redirect(url_for("dashboard"))
 
@@ -5378,7 +5652,7 @@ def admin_cancellation_fees():
 def update_refund_status(refund_id):
 
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     status = request.form.get("status", "")
     admin_notes = request.form.get("admin_notes", "").strip()
@@ -5464,7 +5738,7 @@ def report_period_bounds(period):
 @app.route("/admin/reports")
 def admin_reports():
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 1:
         return redirect(url_for("dashboard"))
 
@@ -5529,7 +5803,7 @@ def admin_reports():
 @app.route("/admin/reports/export.csv")
 def export_reports_csv():
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 1:
         return redirect(url_for("dashboard"))
 
@@ -5578,7 +5852,7 @@ ACTIVITY_ENTITY_TYPES = ("booking", "refund_request", "package", "travel_group",
 @app.route("/admin/activity")
 def admin_activity():
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 1:
         return redirect(url_for("dashboard"))
 
@@ -5614,7 +5888,7 @@ def admin_activity():
 @app.route("/search")
 def search():
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 0:
         return redirect(url_for("admin_dashboard"))
 
@@ -5676,7 +5950,7 @@ SUPPORT_TICKET_LIMIT_PER_HOUR = 5
 @app.route("/help")
 def help_center():
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 0:
         return redirect(url_for("admin_support"))
 
@@ -5700,7 +5974,7 @@ def help_center():
 @app.route("/help/tickets", methods=["POST"])
 def create_support_ticket():
     if "username" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     if session.get("user") != 0:
         return redirect(url_for("admin_support"))
 
@@ -5734,7 +6008,7 @@ def create_support_ticket():
 @app.route("/admin/support")
 def admin_support():
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     status = request.args.get("status", "")
     sql = (
@@ -5756,7 +6030,7 @@ def admin_support():
 @app.route("/admin/support/<int:ticket_id>/reply", methods=["POST"])
 def reply_support_ticket(ticket_id):
     if "username" not in session or session.get("user") != 1:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     reply = request.form.get("reply", "").strip()
     new_status = request.form.get("status", "Answered")
@@ -5793,7 +6067,7 @@ def reply_support_ticket(ticket_id):
 @app.route("/notifications")
 def notifications():
     if "user_id" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
 
     items = query(
         "SELECT id, message, link, is_read, created_at FROM notifications WHERE user_id = %s ORDER BY created_at DESC, id DESC",
@@ -5805,7 +6079,7 @@ def notifications():
 @app.route("/notifications/read", methods=["POST"])
 def read_notifications():
     if "user_id" not in session:
-        return redirect(url_for("login"))
+        return redirect_to_login()
     execute("UPDATE notifications SET is_read = 1 WHERE user_id = %s AND is_read = 0", (session["user_id"],))
     return redirect(url_for("notifications"))
 

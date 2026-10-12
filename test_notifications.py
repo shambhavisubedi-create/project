@@ -35,7 +35,7 @@ class NotificationTests(unittest.TestCase):
         csrf = self._csrf()
         for path in ['/notifications', '/notifications/read']:
             response = self.client.post(path, data=csrf) if path.endswith('read') else self.client.get(path)
-            self.assertTrue(response.location.endswith('/login'))
+            self.assertTrue(response.location.startswith('/login'))
         self.query.assert_not_called()
         self.execute.assert_not_called()
 

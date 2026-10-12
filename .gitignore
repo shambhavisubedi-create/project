@@ -5,3 +5,4 @@ instance/
 .claude/
 logs/
 backups/
+static/uploads/

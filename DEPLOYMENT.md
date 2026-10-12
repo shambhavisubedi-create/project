@@ -66,9 +66,11 @@ gunicorn wsgi:application --bind 127.0.0.1:8000 --workers 1 --threads 8
 waitress-serve --listen=127.0.0.1:8000 wsgi:application
 ```
 
-Use **one worker process with several threads**. The login lock-out and the
-rate limiters keep their counts in memory, so with several worker *processes*
-each would count separately and the limits would be weaker. One worker with
+Use **one worker process with several threads**. The login lock-out is stored
+in the database (`login_attempts` table), so it survives restarts and is shared
+by every worker. The sign-up / password-reset / support-ticket rate limiters
+still keep their counts in memory, so with several worker *processes* each
+would count separately and those limits would be weaker. One worker with
 threads handles a site of this size comfortably.
 
 Keep it running with systemd (Linux) or NSSM / Task Scheduler (Windows) so it
@@ -106,6 +108,10 @@ Then `sudo certbot --nginx -d yourdomain.com` for a free certificate.
   endpoints, which cannot collect real money. Set `ESEWA_PRODUCT_CODE`,
   `ESEWA_SECRET_KEY`, `ESEWA_FORM_URL` and `ESEWA_STATUS_URL` in `.env` to the
   production values from your eSewa merchant account (no code change needed).
+  With `APP_ENV=production` the app **refuses eSewa payments while the public
+  sandbox key is still in use** (anyone could forge a "paid" result with it).
+  For a demo site that only uses eSewa's test wallet, set `ESEWA_ALLOW_SANDBOX=1`
+  to opt in deliberately.
 - **Stripe** — use live keys, and in the Stripe dashboard add a webhook to
   `https://yourdomain.com/webhooks/stripe` for `checkout.session.completed`;
   put its signing secret in `STRIPE_WEBHOOK_SECRET`.

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoGather - End-User License Agreement</title>
+<style>
+  :root {
+    --primary: #a9455c;
+    --primary-dark: #8a3549;
+    --primary-light: #fbe4e6;
+    --charcoal: #2c2420;
+    --text: #4a3d38;
+    --text-muted: #8a7b73;
+    --border: #f0e3d5;
+    --bg: #fdf3ea;
+    --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: var(--bg); color: var(--text); }
+  a { color: var(--primary-dark); }
+  .navbar { background: var(--bg); border-bottom: 1px solid var(--border); }
+  .navbar-inner { max-width: 900px; margin: 0 auto; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; color: var(--charcoal); text-decoration: none; }
+  main { max-width: 780px; margin: 0 auto; padding: 40px 28px 70px; }
+  h1 { font-family: var(--font-display); color: var(--charcoal); font-size: 2rem; margin: 0 0 6px; }
+  .updated { color: var(--text-muted); font-size: 0.85rem; margin: 0 0 24px; }
+  h2 { font-family: var(--font-display); color: var(--charcoal); font-size: 1.15rem; margin: 26px 0 8px; }
+  p, li { line-height: 1.7; font-size: 0.95rem; }
+  ul { padding-left: 20px; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 28px 32px; }
+  .summary { background: #f8ebe5; border-radius: 10px; padding: 14px 18px; margin-bottom: 8px; }
+  .eula-text { max-height: 340px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; padding: 4px 20px 16px; margin: 18px 0; background: #fffdfb; }
+  .error { background: var(--primary-light); color: var(--primary-dark); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-weight: 600; }
+  .accept { display: flex; gap: 10px; align-items: flex-start; font-size: 0.95rem; line-height: 1.5; }
+  .accept input { margin-top: 4px; }
+  .actions { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+  button, .btn-secondary { font: inherit; font-weight: 600; padding: 12px 22px; border-radius: 10px; cursor: pointer; text-decoration: none; }
+  button { background: var(--primary); color: #fff; border: 0; }
+  button:hover { background: var(--primary-dark); }
+  .btn-secondary { color: var(--primary-dark); border: 1px solid var(--border); background: #fff; }
+</style>
+{% include "_ui_head.html" %}
+</head>
+<body>
+  <div class="navbar"><div class="navbar-inner"><a class="brand" href="{{ url_for('landing') }}">GoGather</a></div></div>
+  <main>
+    <h1>End-User License Agreement</h1>
+    <p class="updated">Please read and accept before paying for your trip.</p>
+    <div class="card">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="error">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <div class="summary">
+        <strong>{{ booking.package_name }}</strong> &middot; Booking #{{ booking.id }}<br>
+        Amount: <strong>NPR {{ '{:,.2f}'.format(booking.price) }}</strong>
+        &middot; Paying with <strong>{{ 'eSewa' if method == 'esewa' else 'Card (Stripe)' }}</strong>
+      </div>
+
+      <div class="eula-text">
+        <h2>1. Licence to use GoGather</h2>
+        <p>GoGather grants you a personal, non-exclusive, non-transferable, revocable licence to use the platform to
+        book and pay for travel packages. You may not copy, resell, reverse-engineer or misuse the platform or its
+        content, including e-tickets and booking confirmations.</p>
+
+        <h2>2. Your payment</h2>
+        <ul>
+          <li>You are authorised to use the payment method you choose, and the details you provide are accurate.</li>
+          <li>The price shown includes a {{ service_fee_percent|round|int }}% GoGather service fee. Payment is processed by an independent
+            third party (eSewa or Stripe), whose own terms apply while you are on their payment page.</li>
+          <li>Card payments are charged in USD at the converted amount shown on the Stripe page.</li>
+        </ul>
+
+        <h2>3. Cancellations and refunds</h2>
+        <p>If you cancel a paid booking, a flat <strong>{{ cancellation_fee_percent|round|int }}% cancellation fee</strong>
+        applies and the remainder is refunded to the original payment method once an admin approves and processes the
+        request. See the full <a href="{{ url_for('terms') }}#refund" target="_blank">refund policy</a>.</p>
+
+        <h2>4. Travel risks and supplier services</h2>
+        <p>Treks, safaris and transport are delivered by third-party suppliers. Travel carries inherent risks,
+        including weather, altitude and natural events. You travel at your own risk, you will follow guides' safety
+        instructions, and GoGather is not liable for a supplier's failure to deliver a service beyond helping
+        coordinate a resolution and any refund our policy provides.</p>
+
+        <h2>5. Accurate information</h2>
+        <p>You confirm that the traveller count, dates and contact details on this booking are correct. GoGather may
+        cancel a booking made with false information.</p>
+
+        <h2>6. Data</h2>
+        <p>We use your information as described in our <a href="{{ url_for('privacy') }}" target="_blank">Privacy Policy</a>.
+        GoGather never stores your full card number or eSewa credentials.</p>
+
+        <h2>7. Termination</h2>
+        <p>We may suspend or terminate your access if you breach this agreement or our
+        <a href="{{ url_for('terms') }}" target="_blank">Terms &amp; Conditions</a>.</p>
+      </div>
+
+      <form method="post" action="{{ url_for('payment_agreement', booking_id=booking.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="method" value="{{ method }}">
+        <label class="accept">
+          <input type="checkbox" name="accept_eula" required>
+          <span>I have read and agree to the End-User License Agreement, the Terms &amp; Conditions and the refund policy.</span>
+        </label>
+        <div class="actions">
+          <button type="submit">Accept &amp; continue to payment</button>
+          <a class="btn-secondary" href="{{ url_for('my_bookings') }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </main>
+{% include "_ui_foot.html" %}
+</body>
+</html>

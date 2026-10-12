@@ -1,0 +1,289 @@
+================================================================
+ PHOTO TRAIL & DATE GUARD
+ Step-by-step walkthrough of two mechanisms in app.py
+================================================================
+
+This document explains, step by step, how two features actually
+work in the existing code:
+
+  1. PROFILE PHOTO — how a traveller's photo is replaced without
+     the old one ever being deleted.
+
+  2. BOOKING DATES — how the booking form stops a traveller from
+     double-booking overlapping trip dates.
+
+For each step below: what the traveller/app is doing, the actual
+code that runs at that moment, and what it means in plain words.
+
+
+================================================================
+ PART 1 — PROFILE PHOTO
+ Concept: write the new file, keep the old one, move the pointer
+================================================================
+
+TECHNICAL NAME
+---------------
+"Append-only (versioned) storage with a mutable pointer." Nothing
+is ever overwritten on disk. Every new upload becomes a brand-new
+file. Only one small database field is updated to say "this is
+the current one."
+
+ANALOGY
+-------
+A library never throws away an old edition of a book. When a new
+edition arrives, it goes on the shelf next to the old one, and
+the catalogue card is updated to say "the current edition is
+over here." The old copy still physically exists in the archive
+— it's just no longer what the card points to.
+
+
+STEP 1 — The two ground rules are set up
+
+    AVATAR_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+    MAX_AVATAR_SIZE = 3 * 1024 * 1024  # 3 MB
+
+Before anything else, the app defines what counts as an
+acceptable photo: only these four file types, and nothing larger
+than 3 MB. These two values get checked later, every time someone
+uploads a photo.
+
+
+STEP 2 — Traveller submits the profile form with a new photo
+
+    avatar_file = request.files.get("avatar")
+    avatar_data = avatar_file.read() if avatar_file and avatar_file.filename else None
+
+When the traveller saves their profile, Flask grabs whatever file
+they attached and reads its raw bytes into memory as avatar_data.
+If they didn't pick a new photo at all, avatar_data stays empty
+(None) — which means everything below is simply skipped, and
+updating your name or phone number never touches your photo.
+
+
+STEP 3 — The photo is validated before anything is saved
+
+    elif avatar_data is not None and not avatar_extension(avatar_file.filename):
+        flash("Please upload a PNG, JPG or WEBP image.", "error")
+    elif avatar_data is not None and len(avatar_data) > MAX_AVATAR_SIZE:
+        flash("Please upload an image under 3 MB.", "error")
+
+The app checks the new photo against the two rules from Step 1.
+If it's the wrong file type, or too big, it's rejected right
+here with an error message — and because nothing has been saved
+yet, the traveller's existing photo is completely unaffected.
+
+
+STEP 4 — A brand-new, never-before-used filename is invented
+
+    def save_avatar(user_id, filename, data):
+        ext = avatar_extension(filename)
+        avatar_dir = Path(app.static_folder) / "uploads" / "avatars"
+        avatar_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = int(time.time() * 1000)
+        avatar_filename = f"avatar_{user_id}_{timestamp}.{ext}"
+        avatar_path = avatar_dir / avatar_filename
+
+This is the core trick of the whole feature. Instead of reusing
+the traveller's existing photo filename, the app stamps the
+current moment in time (down to the millisecond) into a brand
+new filename, like:
+
+    avatar_7_1739200455123.jpg
+
+The next time this same traveller uploads a photo, a different
+timestamp gets used, producing a different filename, e.g.:
+
+    avatar_7_1739200791456.jpg
+
+Because the filename is always new, there is never a reason to
+touch, rename, or delete the previous file.
+
+
+STEP 5 — The new photo is physically written to disk
+
+    avatar_path.write_bytes(data)
+    return f"uploads/avatars/{avatar_filename}"
+
+The uploaded bytes are saved under that brand-new filename inside
+static/uploads/avatars/. The old photo file — from the previous
+upload — is still sitting in that same folder, completely
+untouched. Nothing in this code ever opens or deletes it.
+
+
+STEP 6 — Only the database "pointer" is updated
+
+    if avatar_data is not None:
+        avatar_path = save_avatar(session["user_id"], avatar_file.filename, avatar_data)
+        execute("UPDATE users SET avatar = %s WHERE id = %s", (avatar_path, session["user_id"]))
+
+Back in the profile route, once the new file has been saved to
+disk, the app runs a database UPDATE that changes exactly one
+thing: the text stored in the "avatar" column for that traveller,
+so it now points to the new file's path. This is the only place
+where anything "switches over" to the new photo — and it's a
+one-line text change in the database, not a change to any image
+file.
+
+
+STEP 7 — The profile page shows whatever the pointer says
+
+    user = query(
+        "SELECT full_name, username, email, phone, avatar, created_at FROM users WHERE id = %s",
+        (session["user_id"],), fetch="one",
+    )
+
+Every time the profile page loads, it simply reads whatever path
+is currently stored in the "avatar" column and displays that
+image. Since Step 6 just updated that column, the page now shows
+the new photo — but the page has no awareness that an older photo
+file still exists on disk.
+
+
+IN ONE SENTENCE
+----------------
+"The new photo replaces the old one" is true from what the
+traveller SEES (they only ever see the latest photo), but not
+true on disk — the previous image file is still sitting in
+static/uploads/avatars/, simply orphaned, with nothing pointing
+at it anymore.
+
+
+================================================================
+ PART 2 — BOOKING DATE RESTRICTION
+ Concept: no traveller can be in two places on the same day
+================================================================
+
+TECHNICAL NAME
+---------------
+A classic "date-range overlap check." Before a booking is allowed
+to save, the server works out which calendar days the new trip
+would occupy, compares that range against every trip the
+traveller already has, and blocks the booking if even a single
+day is shared.
+
+ANALOGY
+-------
+It's the same check a hotel receptionist does with a paper
+diary — before writing in a new reservation, they run a finger
+along the existing bookings for that guest to see if any of the
+days are already inked in.
+
+
+STEP 1 — How far ahead a trip can even be booked
+
+    MAX_BOOKING_DAYS_AHEAD = 180
+
+Separately from the overlap logic, the app first limits how far
+in advance any trip can be booked at all: at most 180 days
+(roughly six months) from today.
+
+
+STEP 2 — Traveller submits the booking form
+
+    travel_date = request.form.get("travel_date", "")
+    ...
+    travellers = int(request.form.get("travellers", "0"))
+
+The app reads the date the traveller picked and how many people
+are travelling, ready to validate them.
+
+
+STEP 3 — The basic details are checked first
+
+    if (
+        package is None
+        or travel_date < date.today().isoformat()
+        or travel_date > max_travel_date
+        or not phone
+        or not 1 <= travellers <= 20
+    ):
+        flash("Please complete all booking details with a valid travel date within the next 6 month years.", "error")
+
+Before even considering overlaps, the app makes sure: a real
+package was selected, the date isn't in the past, the date isn't
+further out than the 180-day limit from Step 1, a phone number
+exists, and the traveller count is reasonable (1 to 20). If any
+of these fail, the booking stops here.
+
+
+STEP 4 — The new trip's full date range is worked out
+
+    def has_overlapping_booking(user_id, travel_date, duration_days):
+        new_start = travel_date
+        new_end = travel_date + timedelta(days=duration_days - 1)
+
+If the basic checks pass, the app calls this function to check
+for overlaps. First it figures out every day the new trip would
+occupy. A 5-day package starting on the 10th, for example,
+occupies the 10th through the 14th — that's what new_end works
+out to.
+
+
+STEP 5 — Every one of the traveller's other active trips is pulled
+
+    active_bookings = query(
+        """
+        SELECT b.travel_date, COALESCE(p.duration_days, 1) AS duration_days
+        FROM bookings b
+        LEFT JOIN packages p ON p.id = b.package_id
+        WHERE b.user_id = %s AND b.status != 'Cancelled'
+        """,
+        (user_id,),
+    )
+
+The app looks up every booking this same traveller already has —
+but deliberately leaves out any booking with status 'Cancelled',
+since a cancelled trip no longer occupies those dates.
+
+
+STEP 6 — Each existing trip is compared against the new one
+
+    for booking in active_bookings:
+        existing_start = booking["travel_date"]
+        existing_end = existing_start + timedelta(days=booking["duration_days"] - 1)
+        if new_start <= existing_end and existing_start <= new_end:
+            return True
+
+    return False
+
+For every existing trip, the app works out its date range the
+same way as Step 4, then applies one rule: two date ranges
+overlap exactly when each one starts before the other one ends.
+The moment one existing trip matches that rule, the function
+immediately reports "yes, this clashes" and stops checking any
+further trips. If it gets through the whole list without a
+match, it reports "no clash."
+
+
+STEP 7 — The booking is accepted or rejected based on that result
+
+    elif has_overlapping_booking(session["user_id"], date.fromisoformat(travel_date), package["duration_days"]):
+        flash("You already have a trip booked over these dates. You can only book one package at a time for a given period.", "error")
+    else:
+        execute(
+            """
+            INSERT INTO bookings
+                (user_id, package_id, package_name, travel_date, travellers, phone, price, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'Pending')
+            """,
+            (...),
+        )
+
+If Step 6 came back True, the booking is refused with an error
+message and nothing is written to the database — the traveller's
+existing trip stays exactly as it was. Only if there's no clash
+does the app actually INSERT the new booking, with a status of
+'Pending' until an admin approves it.
+
+
+WORTH TELLING YOUR SUPERVISOR
+-------------------------------
+The overlap check only looks at THIS ONE traveller's own
+bookings — it has nothing to do with how many seats a package
+has, or whether other travellers are booked on the same dates.
+It purely stops one person from accidentally (or fraudulently)
+holding two trips on the same day.
+
+================================================================
+ End of document — walkthrough based on the existing app.py code
+================================================================

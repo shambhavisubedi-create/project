@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS `bookings` (
   `service_fee` decimal(10,2) NOT NULL DEFAULT 0.00,
   `discount_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
   `reminder_sent_at` timestamp NULL DEFAULT NULL,
+  `eula_accepted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `user_id` (`user_id`),
   KEY `package_id` (`package_id`),
@@ -100,6 +101,13 @@ CREATE TABLE IF NOT EXISTS `group_messages` (
   KEY `user_id` (`user_id`),
   CONSTRAINT `group_messages_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `travel_groups` (`id`) ON DELETE CASCADE,
   CONSTRAINT `group_messages_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `login_attempts` (
+  `throttle_key` varchar(190) NOT NULL,
+  `failed_count` int(11) NOT NULL DEFAULT 0,
+  `locked_until` datetime DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`throttle_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `notifications` (
   `id` int(11) NOT NULL AUTO_INCREMENT,

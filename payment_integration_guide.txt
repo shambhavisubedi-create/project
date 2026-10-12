@@ -1,0 +1,379 @@
+================================================================
+ PAYMENT INTEGRATION GUIDE — eSewa & Fonepay
+ Step-by-step: what to add, where, and how it works
+ (Guide only — nothing in app.py has been changed)
+================================================================
+
+WHAT THIS DOCUMENT IS
+-----------------------
+A step-by-step plan for adding "Pay with eSewa / Fonepay" to the
+GoGather booking flow. Nothing here has been written into app.py
+— these are the pieces you add yourself, with the code for each
+piece and why it's needed. Exact field names/URLs can shift
+slightly between gateway API versions, so double-check them
+against the developer PDF/portal you get when you register as a
+merchant with eSewa and Fonepay — the CONCEPT and STRUCTURE below
+will stay the same either way.
+
+
+================================================================
+ THE CONCEPT (applies to both gateways)
+================================================================
+
+Every redirect-based payment gateway — eSewa, Fonepay, Khalti,
+even card gateways like Stripe Checkout — works the same way
+underneath, in 5 stages:
+
+  1. INITIATE   Your server decides someone owes money (a
+                booking), and builds a signed request describing
+                the amount and a unique transaction ID.
+
+  2. REDIRECT   The traveller's browser is sent to the gateway's
+                website, carrying that signed request. Your
+                server never touches their card/wallet PIN — the
+                gateway's own page collects it.
+
+  3. PAY        The traveller completes payment on the gateway's
+                page. Your app has no visibility into this step.
+
+  4. RETURN     The gateway redirects the browser back to a URL
+                you gave it (success_url / RU), carrying a
+                result and its own signature.
+
+  5. VERIFY     Your server must NOT trust that redirect at face
+                value (anyone could forge a browser redirect to
+                your success URL). It re-checks the signature
+                and/or calls the gateway's own "check status" API
+                before marking the booking as paid.
+
+The "signature" (also called DV, or a signed_field_names +
+signature pair) is a hash built from the transaction details
+using a SECRET KEY that only your server and the gateway know.
+It's how each side proves the request/response wasn't tampered
+with in the browser in between.
+
+
+================================================================
+ WHAT YOU NEED FROM ESEWA / FONEPAY FIRST
+================================================================
+
+Before writing any code:
+
+  - Register as a merchant with eSewa and/or Fonepay (or use
+    their sandbox/test credentials while developing).
+  - You'll receive, for each gateway:
+      * A merchant/product code   (eSewa: product_code,
+                                    Fonepay: PID)
+      * A secret key              (used to sign requests and
+                                    verify responses — never put
+                                    this in any HTML/JS the
+                                    browser can see)
+      * Sandbox + production base URLs
+
+  - Store these in environment variables, not hard-coded in
+    app.py, e.g.:
+
+        ESEWA_PRODUCT_CODE=EPAYTEST
+        ESEWA_SECRET_KEY=8gBm/:&EnhH.1/q
+        FONEPAY_PID=your_test_pid
+        FONEPAY_SECRET_KEY=your_test_secret
+
+    (The values above are eSewa's published TEST credentials —
+    fine for development, must be swapped for your real merchant
+    credentials before going live.)
+
+
+================================================================
+ PART 1 — ESEWA INTEGRATION
+================================================================
+
+CONCEPT
+-------
+eSewa uses a signed HTML FORM that auto-submits (POST) the
+browser to eSewa's payment page. eSewa signs its own response
+using the same method, so you can verify it came from eSewa and
+wasn't altered.
+
+
+STEP 1 — Add a module for the eSewa logic (e.g. payments_esewa.py)
+
+    import hashlib
+    import hmac
+    import base64
+    import os
+
+    ESEWA_PRODUCT_CODE = os.environ["ESEWA_PRODUCT_CODE"]
+    ESEWA_SECRET_KEY = os.environ["ESEWA_SECRET_KEY"]
+    ESEWA_FORM_URL = "https://rc-epay.esewa.com.np/api/epay/main/v2/form"   # sandbox
+    ESEWA_STATUS_URL = "https://rc.esewa.com.np/api/epay/transaction/status/"  # sandbox
+
+This keeps all eSewa-specific code in one place instead of mixed
+into the booking route.
+
+
+STEP 2 — Build the signature for the outgoing request
+
+    def sign(message: str, secret_key: str) -> str:
+        digest = hmac.new(
+            secret_key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256
+        ).digest()
+        return base64.b64encode(digest).decode("utf-8")
+
+eSewa expects a signature built from three fields, in this exact
+order and format: "total_amount=X,transaction_uuid=Y,
+product_code=Z" — signed with your secret key.
+
+
+STEP 3 — When the traveller clicks "Pay with eSewa", build the
+          payment form fields
+
+    def build_esewa_payment(booking_id, total_amount):
+        transaction_uuid = f"gogather-{booking_id}-{int(time.time())}"
+        message = (
+            f"total_amount={total_amount},"
+            f"transaction_uuid={transaction_uuid},"
+            f"product_code={ESEWA_PRODUCT_CODE}"
+        )
+        return {
+            "amount": total_amount,
+            "tax_amount": 0,
+            "total_amount": total_amount,
+            "transaction_uuid": transaction_uuid,
+            "product_code": ESEWA_PRODUCT_CODE,
+            "product_service_charge": 0,
+            "product_delivery_charge": 0,
+            "success_url": url_for("esewa_success", _external=True),
+            "failure_url": url_for("esewa_failure", _external=True),
+            "signed_field_names": "total_amount,transaction_uuid,product_code",
+            "signature": sign(message, ESEWA_SECRET_KEY),
+        }
+
+transaction_uuid must be unique per attempt — it's what ties the
+payment back to a specific booking later, so it's worth saving it
+against the booking row (e.g. a new bookings.transaction_uuid
+column) before redirecting.
+
+
+STEP 4 — A route that renders an auto-submitting form
+
+    @app.route("/pay/esewa/<int:booking_id>")
+    def pay_with_esewa(booking_id):
+        booking = get_booking_or_404(booking_id)   # your own lookup
+        fields = build_esewa_payment(booking_id, booking["price"])
+        execute("UPDATE bookings SET transaction_uuid = %s WHERE id = %s",
+                (fields["transaction_uuid"], booking_id))
+        return render_template("esewa_redirect.html",
+                                form_url=ESEWA_FORM_URL, fields=fields)
+
+    <!-- esewa_redirect.html -->
+    <form id="esewaForm" method="POST" action="{{ form_url }}">
+      {% for name, value in fields.items() %}
+        <input type="hidden" name="{{ name }}" value="{{ value }}">
+      {% endfor %}
+    </form>
+    <script>document.getElementById("esewaForm").submit();</script>
+
+This page is only ever seen for a split second — it exists purely
+to POST the traveller's browser to eSewa with all the signed
+fields attached.
+
+
+STEP 5 — Handle the return, and VERIFY before trusting it
+
+    @app.route("/esewa/success")
+    def esewa_success():
+        encoded = request.args.get("data", "")
+        payload = json.loads(base64.b64decode(encoded))
+
+        expected_message = (
+            f"total_amount={payload['total_amount']},"
+            f"transaction_uuid={payload['transaction_uuid']},"
+            f"product_code={payload['product_code']}"
+        )
+        if sign(expected_message, ESEWA_SECRET_KEY) != payload["signature"]:
+            flash("Payment could not be verified.", "error")
+            return redirect(url_for("dashboard"))
+
+        status = requests.get(ESEWA_STATUS_URL, params={
+            "product_code": payload["product_code"],
+            "total_amount": payload["total_amount"],
+            "transaction_uuid": payload["transaction_uuid"],
+        }).json()
+
+        if status.get("status") == "COMPLETE":
+            execute("UPDATE bookings SET status = 'Paid' WHERE transaction_uuid = %s",
+                    (payload["transaction_uuid"],))
+            flash("Payment successful!", "success")
+        else:
+            flash("Payment was not completed.", "error")
+
+        return redirect(url_for("dashboard"))
+
+    @app.route("/esewa/failure")
+    def esewa_failure():
+        flash("Payment was cancelled or failed.", "error")
+        return redirect(url_for("dashboard"))
+
+Two layers of trust here, on purpose: re-checking the signature
+eSewa sent back, AND calling eSewa's own status-check API. Either
+one alone can be spoofed by someone crafting their own redirect;
+together, they can't.
+
+
+================================================================
+ PART 2 — FONEPAY INTEGRATION
+================================================================
+
+CONCEPT
+-------
+Fonepay works the same way in spirit, but instead of an auto-
+submitting form, you build a signed URL with query parameters and
+send the traveller there directly (a redirect, not a POST form).
+The signature algorithm is HMAC-SHA512 instead of SHA256.
+
+
+STEP 1 — A module for Fonepay logic (e.g. payments_fonepay.py)
+
+    import hashlib
+    import hmac
+    import os
+    from datetime import date
+
+    FONEPAY_PID = os.environ["FONEPAY_PID"]
+    FONEPAY_SECRET_KEY = os.environ["FONEPAY_SECRET_KEY"]
+    FONEPAY_BASE_URL = "https://dev-clientapi.fonepay.com/api/merchantRequest"  # sandbox
+
+
+STEP 2 — Build the signature
+
+    def sign_fonepay(*fields):
+        message = ",".join(str(f) for f in fields)
+        return hmac.new(
+            FONEPAY_SECRET_KEY.encode("utf-8"), message.encode("utf-8"), hashlib.sha512
+        ).hexdigest()
+
+Fonepay signs a comma-joined string of the request fields, in a
+fixed order, the same way eSewa does — just with a different hash
+algorithm and field set.
+
+
+STEP 3 — Build the redirect URL when the traveller pays
+
+    def build_fonepay_url(booking_id, amount):
+        prn = f"gogather-{booking_id}-{int(time.time())}"   # your own unique ref
+        today = date.today().strftime("%m/%d/%Y")
+        return_url = url_for("fonepay_return", _external=True)
+
+        dv = sign_fonepay(FONEPAY_PID, "P", prn, amount, "NPR",
+                           today, booking_id, "GoGather booking", return_url)
+
+        params = {
+            "PID": FONEPAY_PID,
+            "MD": "P",
+            "PRN": prn,
+            "AMT": amount,
+            "CRN": "NPR",
+            "DT": today,
+            "R1": booking_id,
+            "R2": "GoGather booking",
+            "RU": return_url,
+            "DV": dv,
+        }
+        return f"{FONEPAY_BASE_URL}?{urlencode(params)}", prn
+
+
+STEP 4 — Route that redirects to Fonepay
+
+    @app.route("/pay/fonepay/<int:booking_id>")
+    def pay_with_fonepay(booking_id):
+        booking = get_booking_or_404(booking_id)
+        url, prn = build_fonepay_url(booking_id, booking["price"])
+        execute("UPDATE bookings SET transaction_uuid = %s WHERE id = %s",
+                (prn, booking_id))
+        return redirect(url)
+
+Unlike eSewa, there's no intermediate HTML page needed — Flask's
+own redirect() sends the browser straight to Fonepay with the
+signed query string attached.
+
+
+STEP 5 — Handle the return, and VERIFY
+
+    @app.route("/fonepay/return")
+    def fonepay_return():
+        prn = request.args.get("PRN")
+        status_ok = request.args.get("PS") == "true"
+        response_dv = request.args.get("DV")
+
+        expected_dv = sign_fonepay(
+            request.args.get("PID"), request.args.get("PRN"),
+            request.args.get("PS"), request.args.get("RC"),
+            request.args.get("UID"), request.args.get("BC"),
+            request.args.get("INI"), request.args.get("P_AMT"),
+            request.args.get("R1"), request.args.get("R2"),
+        )
+
+        if response_dv != expected_dv or not status_ok:
+            flash("Payment could not be verified.", "error")
+            return redirect(url_for("dashboard"))
+
+        execute("UPDATE bookings SET status = 'Paid' WHERE transaction_uuid = %s", (prn,))
+        flash("Payment successful!", "success")
+        return redirect(url_for("dashboard"))
+
+Same principle as eSewa's success handler: never trust the query
+string just because it arrived at your success URL — recompute
+the signature yourself and compare.
+
+  NOTE: Fonepay's exact response field names/order for the DV
+  check can differ slightly by merchant account version — the
+  Fonepay merchant onboarding packet will list the authoritative
+  field order for your account. Treat the block above as the
+  correct SHAPE of the check, and confirm field names against
+  your own credentials packet before going live.
+
+
+================================================================
+ HOW IT ALL WORKS TOGETHER (END TO END)
+================================================================
+
+  1. Traveller finishes booking a package (existing flow,
+     status = "Pending").
+  2. Traveller is shown a "Pay with eSewa" / "Pay with Fonepay"
+     button on their booking/dashboard page.
+  3. Clicking it hits /pay/esewa/<id> or /pay/fonepay/<id>, which
+     builds a signed request and sends the browser to the
+     gateway.
+  4. Traveller completes payment on eSewa's/Fonepay's own site —
+     your app is not involved in that step at all.
+  5. The gateway redirects back to your success/return route.
+  6. Your route re-verifies the signature (and, for eSewa, also
+     calls the status-check API) before trusting the result.
+  7. Only after verification does the code update the booking's
+     status — e.g. from "Pending" to "Paid" — in the database.
+
+This mirrors the same principle already used elsewhere in the
+app: never trust something that came from the browser (a form
+field, a redirect, a query string) without checking it against
+something only the server side can verify — the same reason the
+booking form always uses the phone number from the traveller's
+own account instead of trusting a submitted field.
+
+
+================================================================
+ SUGGESTED DATABASE CHANGE
+================================================================
+
+Both flows above assume a way to tie a gateway transaction back
+to a specific booking. That needs one new column:
+
+    ALTER TABLE bookings ADD COLUMN transaction_uuid VARCHAR(100) NULL;
+
+and a booking status of "Paid" (alongside the existing "Pending",
+"Approved"/"Confirmed", "Cancelled", etc. — match whatever your
+status values already are).
+
+
+================================================================
+ End of guide — nothing in app.py or templates has been changed
+================================================================

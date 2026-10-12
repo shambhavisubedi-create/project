@@ -1,0 +1,189 @@
+================================================================
+ PAYMENT INTEGRATION -- eSewa + Stripe
+ Everything that was changed, added, or altered, in one place
+================================================================
+
+WHAT WAS DONE
+-------------
+Added two payment options for CONFIRMED bookings only:
+  - eSewa   (NPR, Nepal's local wallet gateway)
+  - Stripe  (USD, card payments, for international travellers)
+
+Payment is only offered once a booking's status is 'Confirmed' by an
+admin -- this matches the app's existing fraud-prevention pattern
+(admin approves the booking itself before any money changes hands).
+A NEW, separate 'payment_status' column tracks Paid/Unpaid so it
+never collides with the existing booking lifecycle status field
+(Pending / Cancel Requested / Confirmed / Completed / Cancelled).
+
+
+================================================================
+ 1. PYTHON PACKAGES INSTALLED
+================================================================
+Ran: pip install stripe requests
+
+Installed: stripe (15.6.1), requests (2.34.2), plus their
+dependencies (urllib3, idna, charset_normalizer, certifi).
+No requirements.txt existed in this project before or after --
+if you want one, run: pip freeze > requirements.txt
+
+
+================================================================
+ 2. DATABASE CHANGES (bookings table)
+================================================================
+Nothing was run directly against the database by hand. Instead, a
+new function ensure_payment_columns() was added to app.py (same
+pattern as the existing ensure_group_columns() / ensure_user_columns()
+functions) which checks `DESCRIBE bookings` and adds any column
+that's missing. It runs automatically the first time the app
+handles a logged-in request, and again in __main__ at startup.
+
+The columns it adds, if missing:
+
+    ALTER TABLE bookings ADD COLUMN payment_status VARCHAR(20) NOT NULL DEFAULT 'Unpaid';
+    ALTER TABLE bookings ADD COLUMN payment_method VARCHAR(20) NULL;
+    ALTER TABLE bookings ADD COLUMN transaction_uuid VARCHAR(100) NULL;
+    ALTER TABLE bookings ADD COLUMN stripe_session_id VARCHAR(255) NULL;
+
+These will appear in your `bookings` table the next time you run
+the app (via `python app.py` or `flask run`) and log in as any user
+-- you don't need to run any SQL yourself.
+
+
+================================================================
+ 3. NEW/CHANGED FILES
+================================================================
+
+app.py
+------
+  - Added imports: base64, hashlib, hmac, json, requests, stripe
+    (os was already imported).
+  - Added a "PAYMENT GATEWAY CONFIG" block (right after the `npr`
+    Jinja filter is registered) with:
+      ESEWA_PRODUCT_CODE, ESEWA_SECRET_KEY, ESEWA_FORM_URL,
+      ESEWA_STATUS_URL   -- read from env, default to eSewa's
+                            published SANDBOX test credentials.
+      STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET -- read from env,
+                            default to "" (no fallback -- Stripe
+                            calls will fail until you set these).
+      NPR_PER_USD         -- conversion rate used only for Stripe,
+                            default 133, override via env.
+      npr_to_usd_cents()  -- converts a booking's NPR price to USD
+                            cents for Stripe.
+      esewa_sign()        -- HMAC-SHA256 signer used both to build
+                            outgoing eSewa requests and to verify
+                            what eSewa sends back.
+  - Added ensure_payment_columns() (see section 2 above), and
+    wired it into:
+      * the existing `prepare_notifications()` before_request hook
+      * the existing `if __name__ == "__main__":` startup block
+  - `my_bookings()` route: SELECT now also fetches `payment_status`
+    so the template can show it / decide whether to show Pay
+    buttons.
+  - Added, right after the existing `cancel_booking` route:
+      get_payable_booking(booking_id)  -- shared guard: booking
+          must belong to the logged-in user, be 'Confirmed', and
+          not already 'Paid'. Both gateways use this before doing
+          anything.
+      /pay/esewa/<booking_id>   (GET)  -- builds the signed eSewa
+          form fields, saves transaction_uuid, renders
+          esewa_redirect.html.
+      /esewa/success            (GET)  -- eSewa's return URL.
+          Recomputes the signature AND calls eSewa's own status
+          API before marking anything paid -- never trusts the
+          redirect by itself.
+      /esewa/failure            (GET)  -- eSewa's cancel/failure
+          return URL, just flashes a message.
+      /pay/stripe/<booking_id>  (GET)  -- creates a Stripe Checkout
+          Session (USD, converted from the NPR price), saves
+          stripe_session_id, redirects the browser to Stripe.
+      /stripe/success           (GET)  -- Stripe's return URL.
+          Display-only -- does NOT mark the booking paid (a user
+          can land here without having actually completed payment).
+      /webhooks/stripe          (POST) -- the ONLY place a Stripe
+          payment is marked 'Paid'. Verifies the request really
+          came from Stripe via stripe.Webhook.construct_event()
+          before touching the database.
+  Both success paths also call the existing `notify()` helper so
+  the traveller gets an in-app notification once payment clears.
+
+.env
+----
+  Added (values blank/commented so nothing behaves differently
+  until you fill them in):
+
+    # ESEWA_PRODUCT_CODE=        <- commented out on purpose: leaving
+    # ESEWA_SECRET_KEY=             these commented lets app.py fall
+                                     back to eSewa's sandbox test
+                                     credentials. Uncomment + fill in
+                                     only once you have real merchant
+                                     credentials.
+    STRIPE_SECRET_KEY=           <- required, or /pay/stripe will
+                                    error when it calls Stripe.
+    STRIPE_WEBHOOK_SECRET=       <- required for /webhooks/stripe to
+                                    accept anything.
+    NPR_PER_USD=133              <- adjust to the real exchange rate
+                                    whenever you like.
+
+templates/esewa_redirect.html   (NEW FILE)
+------------------------------
+  A tiny auto-submitting HTML form that POSTs the traveller's
+  browser to eSewa's payment page with all the signed fields
+  attached. Only ever visible for a split second.
+
+templates/my_bookings.html
+---------------------------
+  - Added CSS for `.actions`, `.pay`, `.pay-esewa`, `.pay-stripe`,
+    `.paid`.
+  - In the "Upcoming trips" loop only: if a booking's status is
+    'Confirmed', shows either a green "Paid" badge (if
+    payment_status == 'Paid') or two buttons -- "Pay with eSewa
+    (NPR)" -> /pay/esewa/<id>, and "Pay with Card (USD)" ->
+    /pay/stripe/<id>.
+  - Travel history (past bookings) section was left unchanged --
+    no pay buttons there.
+
+payment_integration_guide.txt   (pre-existing, NOT modified)
+-------------------------------------------------------------
+  This was an earlier planning doc already in the repo before this
+  change. It's now superseded by the actual code above, but wasn't
+  deleted in case you want to keep it for reference.
+
+
+================================================================
+ 4. WHAT YOU STILL NEED TO DO
+================================================================
+  1. Confirm the `bookings` table picked up the 4 new columns --
+     just run the app once (`python app.py`) and log in as any
+     user; ensure_payment_columns() runs automatically. You can
+     check with: DESCRIBE bookings;
+
+  2. eSewa: works immediately in sandbox mode with no setup (uses
+     eSewa's published EPAYTEST credentials). To go live, register
+     as an eSewa merchant and put your real product code + secret
+     key into .env (uncomment those two lines).
+
+  3. Stripe: get a Stripe account, put STRIPE_SECRET_KEY into .env.
+     For the webhook, either:
+       - Local testing: run `stripe listen --forward-to
+         localhost:5000/webhooks/stripe` (Stripe CLI) -- it prints
+         a temporary whsec_... to put in STRIPE_WEBHOOK_SECRET.
+       - Production: add a webhook endpoint in the Stripe dashboard
+         pointing at https://<your-domain>/webhooks/stripe,
+         subscribed to `checkout.session.completed`, and copy its
+         signing secret into STRIPE_WEBHOOK_SECRET.
+     Without STRIPE_WEBHOOK_SECRET set correctly, a Stripe payment
+     will succeed on Stripe's side but never get marked 'Paid' in
+     your database -- the webhook is the only place that happens.
+
+  4. Test end-to-end: book a package -> have an admin confirm it in
+     Admin > Bookings -> go to My Bookings -> click either Pay
+     button -> confirm the booking flips to "Paid" afterwards.
+
+  5. Currency: NPR_PER_USD in .env is a manual rate, not live FX --
+     update it yourself when the real rate moves meaningfully.
+
+
+================================================================
+ End of change log
+================================================================

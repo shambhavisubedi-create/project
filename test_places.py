@@ -84,7 +84,7 @@ class PlacesTests(unittest.TestCase):
         self.assertEqual(self.client.post('/admin/places', data=self.data).status_code, 302)
         with self.client.session_transaction() as session:
             session.clear()
-        self.assertTrue(self.client.get('/admin/places').location.endswith('/login'))
+        self.assertTrue(self.client.get('/admin/places').location.startswith('/login'))
 
     def test_empty_catalogue_stays_empty(self):
         for place in self.snapshot:

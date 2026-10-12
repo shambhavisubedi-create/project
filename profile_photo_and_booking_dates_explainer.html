@@ -1,0 +1,360 @@
+<title>Photo Trail &amp; Date Guard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --paper:#F1EEE6; --surface:#FFFFFF; --ink:#1C2B29; --ink-soft:#56655F;
+    --line:#DAD4C4; --accent:#2E6E5B; --accent-soft:#DEEAE3;
+    --flag:#B8492E; --flag-soft:#F3E1D8; --code-bg:#F8F6F0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#141F1C; --surface:#1B2724; --ink:#EDEAE0; --ink-soft:#A9B6AF;
+      --line:#33433D; --accent:#6FC7A8; --accent-soft:#22352E;
+      --flag:#E08363; --flag-soft:#3A241C; --code-bg:#182420;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#141F1C; --surface:#1B2724; --ink:#EDEAE0; --ink-soft:#A9B6AF;
+    --line:#33433D; --accent:#6FC7A8; --accent-soft:#22352E;
+    --flag:#E08363; --flag-soft:#3A241C; --code-bg:#182420;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    line-height:1.6;
+  }
+  .page{ max-width:760px; margin:0 auto; padding:56px 24px 96px; }
+
+  .kicker{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;
+    font-size:12px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--ink-soft); margin:0 0 10px;
+  }
+  h1{
+    font-family:"Newsreader", Georgia, serif; font-weight:600; font-style:italic;
+    font-size:clamp(32px,5vw,44px); line-height:1.1; margin:0 0 14px;
+    text-wrap:balance;
+  }
+  .dek{
+    color:var(--ink-soft); font-size:16.5px; max-width:56ch; margin:0 0 8px;
+  }
+  .meta{
+    font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--ink-soft);
+    margin:18px 0 44px; padding-top:14px; border-top:1px solid var(--line);
+    display:flex; gap:18px; flex-wrap:wrap;
+  }
+  .meta span b{ color:var(--ink); font-weight:500; }
+
+  section.pattern{ margin-bottom:64px; }
+  .eyebrow{
+    font-family:"IBM Plex Mono", monospace; font-size:12px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--accent); font-weight:600;
+    display:flex; align-items:center; gap:8px; margin-bottom:10px;
+  }
+  .eyebrow::before{
+    content:""; width:7px; height:7px; border-radius:50%; background:var(--accent);
+  }
+  h2{
+    font-family:"Newsreader", Georgia, serif; font-weight:600; font-size:28px;
+    margin:0 0 6px; text-wrap:balance;
+  }
+  .concept-name{
+    font-size:15.5px; color:var(--ink-soft); margin:0 0 22px; max-width:62ch;
+  }
+  .concept-name b{ color:var(--ink); font-weight:600; }
+
+  p{ margin:0 0 16px; max-width:66ch; }
+  h3{
+    font-family:"IBM Plex Sans"; font-size:14.5px; font-weight:600;
+    text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft);
+    margin:34px 0 12px;
+  }
+
+  .analogy{
+    background:var(--accent-soft); border-left:3px solid var(--accent);
+    padding:14px 18px; border-radius:2px; margin:0 0 24px;
+    font-size:15px; color:var(--ink);
+  }
+  .analogy b{ font-weight:600; }
+
+  ol.steps{ margin:0 0 8px; padding-left:22px; }
+  ol.steps li{ margin-bottom:12px; max-width:64ch; }
+  ol.steps li b{ font-weight:600; }
+  code.inline{
+    font-family:"IBM Plex Mono", monospace; font-size:0.9em;
+    background:var(--code-bg); border:1px solid var(--line);
+    padding:1px 5px; border-radius:4px; color:var(--ink);
+  }
+
+  /* code walkthrough table */
+  .codewalk{
+    border:1px solid var(--line); border-radius:8px; overflow:hidden;
+    background:var(--surface); margin:0 0 28px;
+  }
+  .codewalk .row{
+    display:grid; grid-template-columns:52px 1fr; gap:0;
+    border-top:1px solid var(--line);
+  }
+  .codewalk .row:first-child{ border-top:none; }
+  .codewalk .ln{
+    font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--ink-soft);
+    background:var(--code-bg); display:flex; align-items:flex-start;
+    justify-content:center; padding:12px 4px; border-right:1px solid var(--line);
+    font-variant-numeric: tabular-nums;
+  }
+  .codewalk .body{ padding:12px 16px 14px; }
+  .codewalk .snippet{
+    display:block; overflow-x:auto; white-space:pre;
+    font-family:"IBM Plex Mono", monospace; font-size:13px;
+    background:var(--code-bg); border:1px solid var(--line); border-radius:5px;
+    padding:8px 10px; margin:0 0 8px; color:var(--ink);
+  }
+  .codewalk .explain{ font-size:14.5px; color:var(--ink-soft); max-width:60ch; }
+  .codewalk .explain b{ color:var(--ink); font-weight:600; }
+
+  /* diagram */
+  figure{ margin:8px 0 30px; }
+  figure svg{ display:block; max-width:100%; height:auto; }
+  figcaption{
+    font-size:13px; color:var(--ink-soft); margin-top:8px; text-align:center;
+  }
+
+  .callout{
+    background:var(--surface); border:1px solid var(--line); border-radius:8px;
+    padding:18px 20px; margin:24px 0; font-size:14.5px;
+  }
+  .callout .tag{
+    font-family:"IBM Plex Mono", monospace; font-size:11px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--flag); font-weight:600; margin-bottom:6px;
+    display:block;
+  }
+
+  .divider{ border:none; border-top:1px solid var(--line); margin:0 0 56px; }
+
+  footer{
+    font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--ink-soft);
+    border-top:1px solid var(--line); padding-top:18px; margin-top:12px;
+  }
+
+  @media (max-width:520px){
+    .codewalk .row{ grid-template-columns:40px 1fr; }
+  }
+</style>
+
+<div class="page">
+
+  <p class="kicker">Engineering notes · GoGather</p>
+  <h1>Photo Trail &amp; Date Guard</h1>
+  <p class="dek">Plain-language walkthroughs of two mechanisms in <code class="inline">app.py</code>: how a traveller's profile photo is replaced without ever deleting the old one, and how the booking form stops a traveller from double-booking overlapping trip dates.</p>
+  <div class="meta">
+    <span>File: <b>app.py</b></span>
+    <span>Profile photo: <b>lines 1317–1401</b></span>
+    <span>Booking dates: <b>lines 730–819</b></span>
+  </div>
+
+  <!-- CONCEPT A -->
+  <section class="pattern">
+    <div class="eyebrow">Pattern · Profile Photos</div>
+    <h2>Write the new file, keep the old one, move the pointer</h2>
+    <p class="concept-name">The technical name for this is <b>append-only (versioned) storage with a mutable pointer</b>. Nothing is ever overwritten on disk — a fresh upload always becomes a brand-new file, and only one small database field is updated to say "this is the current one."</p>
+
+    <div class="analogy">
+      <b>Analogy:</b> think of a library that never throws away an old edition of a book. When a new edition arrives, it goes on the shelf next to the old one, and the catalogue card is updated to say "the current edition is over here." The old copy still physically exists in the archive — it's just no longer what the card points to.
+    </div>
+
+    <h3>What happens, in order</h3>
+    <ol class="steps">
+      <li><b>Traveller opens their profile and picks a new photo.</b> The form sends the file to the <code class="inline">/profile</code> route.</li>
+      <li><b>The server checks the file is safe to accept</b> — a real image type (PNG/JPG/JPEG/WEBP) and under 3&nbsp;MB.</li>
+      <li><b>A brand-new filename is invented</b>, built from the traveller's user ID plus the exact millisecond of the upload — so it can never collide with any file that came before it.</li>
+      <li><b>That file is written to disk under its new name.</b> The previous photo file is not touched, moved, or deleted — it simply stays where it was.</li>
+      <li><b>Only the database is updated</b>, setting the traveller's <code class="inline">avatar</code> column to the new file's path. This single row is the only thing that changes "which photo is current."</li>
+      <li><b>The profile page re-reads that column</b> and displays whatever path it currently holds — which is now the new photo.</li>
+    </ol>
+
+    <div class="callout">
+      <span class="tag">In one sentence</span>
+      "The new one replaces the old one" is true from the <i>user's</i> point of view (they only ever see the latest photo) but not true on <i>disk</i> — the old image file is still sitting in <code class="inline">static/uploads/avatars/</code>, just with nothing pointing at it anymore.
+    </div>
+
+    <h3>The code, line by line</h3>
+    <div class="codewalk">
+      <div class="row">
+        <div class="ln">1317–<br>1318</div>
+        <div class="body">
+          <span class="snippet">AVATAR_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+MAX_AVATAR_SIZE = 3 * 1024 * 1024  # 3 MB</span>
+          <div class="explain">The two rules a photo has to pass: an <b>allowed file type</b>, and a <b>3&nbsp;MB size ceiling</b>.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="ln">1326–<br>1336</div>
+        <div class="body">
+          <span class="snippet">def save_avatar(user_id, filename, data):
+    ext = avatar_extension(filename)
+    avatar_dir = Path(app.static_folder) / "uploads" / "avatars"
+    avatar_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = int(time.time() * 1000)
+    avatar_filename = f"avatar_{user_id}_{timestamp}.{ext}"
+    avatar_path = avatar_dir / avatar_filename
+    avatar_path.write_bytes(data)
+    return f"uploads/avatars/{avatar_filename}"</span>
+          <div class="explain">This is the whole trick. <b>Line 1332</b> grabs the current time down to the millisecond. <b>Line 1333</b> bakes that timestamp into the filename, so every upload this user ever makes gets its own unique file — <code class="inline">avatar_7_1739200455123.jpg</code>, then <code class="inline">avatar_7_1739200791456.jpg</code>, and so on. <b>Line 1335</b> writes the new bytes to that new file. Nothing here ever opens the old file to delete or overwrite it — it's simply left behind in the folder.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="ln">1359–<br>1360</div>
+        <div class="body">
+          <span class="snippet">avatar_file = request.files.get("avatar")
+avatar_data = avatar_file.read() if avatar_file and avatar_file.filename else None</span>
+          <div class="explain">Reads the uploaded photo out of the submitted form. If the traveller didn't choose a new photo, this stays <code class="inline">None</code> and the rest of the avatar logic is skipped entirely — updating your name or phone doesn't touch your photo.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="ln">1366–<br>1372</div>
+        <div class="body">
+          <span class="snippet">elif avatar_data is not None and not avatar_extension(avatar_file.filename):
+    flash("Please upload a PNG, JPG or WEBP image.", "error")
+elif avatar_data is not None and len(avatar_data) > MAX_AVATAR_SIZE:
+    flash("Please upload an image under 3 MB.", "error")</span>
+          <div class="explain">The two guardrails from lines 1317–1318 are enforced here. A bad file type or an oversized file is rejected before anything is saved — the old photo stays exactly as it was.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="ln">1382–<br>1384</div>
+        <div class="body">
+          <span class="snippet">if avatar_data is not None:
+    avatar_path = save_avatar(session["user_id"], avatar_file.filename, avatar_data)
+    execute("UPDATE users SET avatar = %s WHERE id = %s", (avatar_path, session["user_id"]))</span>
+          <div class="explain">This is the "move the pointer" step. <code class="inline">save_avatar()</code> writes the new file and hands back its path. The <code class="inline">UPDATE</code> then changes <b>one text value</b> in the <code class="inline">users</code> table — it does not touch the file that the <i>old</i> path pointed to.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="ln">1396–<br>1397</div>
+        <div class="body">
+          <span class="snippet">user = query(
+    "SELECT full_name, username, email, phone, avatar, created_at FROM users WHERE id = %s",
+    (session["user_id"],), fetch="one",
+)</span>
+          <div class="explain">Whenever the profile page is loaded — including right after the update — it simply reads whatever the <code class="inline">avatar</code> column currently says and shows that image. It has no idea an older file even exists.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- CONCEPT B -->
+  <section class="pattern">
+    <div class="eyebrow">Pattern · Booking Dates</div>
+    <h2>No traveller can be in two places on the same day</h2>
+    <p class="concept-name">This is a classic <b>date-range overlap check</b>. Before a booking is allowed to save, the server works out which calendar days the new trip would occupy, compares that range against every trip the traveller already has, and blocks the booking if even a single day is shared.</p>
+
+    <div class="analogy">
+      <b>Analogy:</b> it's the same check a hotel receptionist does with a paper diary — before writing in a new reservation, they run a finger along the existing bookings for that guest to see if any of the days are already inked in.
+    </div>
+
+    <h3>The overlap rule, visually</h3>
+    <figure>
+      <svg viewBox="0 0 640 210" role="img" aria-label="Two example timelines: one where a new trip's dates overlap an existing trip and is blocked, and one where the dates are separate and the trip is allowed.">
+        <!-- axis -->
+        <line x1="40" y1="40" x2="600" y2="40" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/>
+        <text x="40" y="26" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" fill-opacity="0.6">Day 1</text>
+        <text x="592" y="26" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" fill-opacity="0.6" text-anchor="end">Day 14</text>
+
+        <!-- Example 1: overlap -->
+        <text x="40" y="58" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" fill="currentColor">Example A — overlapping</text>
+        <rect x="80" y="66" width="220" height="18" rx="4" fill="#2E6E5B" opacity="0.85"/>
+        <text x="190" y="79" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle">Existing trip (Chitwan)</text>
+        <rect x="220" y="90" width="220" height="18" rx="4" fill="none" stroke="#B8492E" stroke-width="2"/>
+        <text x="330" y="103" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" text-anchor="middle">New trip (Pokhara)</text>
+        <rect x="220" y="66" width="80" height="42" fill="#B8492E" opacity="0.18"/>
+        <text x="260" y="128" font-family="IBM Plex Mono, monospace" font-size="11" fill="#B8492E" text-anchor="middle" font-weight="600">shared days → BLOCKED</text>
+
+        <!-- Example 2: no overlap -->
+        <text x="40" y="160" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" fill="currentColor">Example B — separate</text>
+        <rect x="80" y="168" width="150" height="18" rx="4" fill="#2E6E5B" opacity="0.85"/>
+        <text x="155" y="181" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle">Existing trip</text>
+        <rect x="260" y="168" width="150" height="18" rx="4" fill="none" stroke="#2E6E5B" stroke-width="2"/>
+        <text x="335" y="181" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" text-anchor="middle">New trip</text>
+        <text x="480" y="181" font-family="IBM Plex Mono, monospace" font-size="11" fill="#2E6E5B" text-anchor="start" font-weight="600">no shared days → ALLOWED</text>
+      </svg>
+      <figcaption>Same rule, two outcomes: a new trip is rejected only if its date range touches an existing (non-cancelled) trip's date range.</figcaption>
+    </figure>
+
+    <h3>The code, line by line</h3>
+    <div class="codewalk">
+      <div class="row">
+        <div class="ln">732</div>
+        <div class="body">
+          <span class="snippet">MAX_BOOKING_DAYS_AHEAD = 180</span>
+          <div class="explain">A separate, simpler rule: a trip can't be booked more than <b>180 days (~6 months)</b> in the future. This is checked before the overlap logic even runs.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="ln">735–<br>740</div>
+        <div class="body">
+          <span class="snippet">def has_overlapping_booking(user_id, travel_date, duration_days):
+    new_start = travel_date
+    new_end = travel_date + timedelta(days=duration_days - 1)</span>
+          <div class="explain">Turns the trip being booked into a <b>date range</b>. A 5-day package starting on the 10th occupies the 10th through the 14th — that's what <code class="inline">new_end</code> works out.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="ln">742–<br>750</div>
+        <div class="body">
+          <span class="snippet">active_bookings = query(
+    """SELECT b.travel_date, COALESCE(p.duration_days, 1) AS duration_days
+       FROM bookings b LEFT JOIN packages p ON p.id = b.package_id
+       WHERE b.user_id = %s AND b.status != 'Cancelled'""",
+    (user_id,),
+)</span>
+          <div class="explain">Pulls every trip this traveller already has, <b>except cancelled ones</b> — a cancelled trip frees up its dates, so it's deliberately left out of the comparison.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="ln">752–<br>756</div>
+        <div class="body">
+          <span class="snippet">for booking in active_bookings:
+    existing_start = booking["travel_date"]
+    existing_end = existing_start + timedelta(days=booking["duration_days"] - 1)
+    if new_start <= existing_end and existing_start <= new_end:
+        return True</span>
+          <div class="explain">This is the actual overlap test, and it's a well-known one-line formula: <b>two date ranges overlap exactly when each one starts before the other one ends.</b> The moment one existing trip fails that test, the function immediately answers "yes, this clashes" and stops checking further.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="ln">758</div>
+        <div class="body">
+          <span class="snippet">return False</span>
+          <div class="explain">If every existing trip was checked and none clashed, the new booking is free to go ahead.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="ln">804–<br>819</div>
+        <div class="body">
+          <span class="snippet">if (package is None or travel_date < date.today().isoformat()
+    or travel_date > max_travel_date or not phone or not 1 <= travellers <= 20):
+    flash("Please complete all booking details...", "error")
+elif has_overlapping_booking(session["user_id"], date.fromisoformat(travel_date), package["duration_days"]):
+    flash("You already have a trip booked over these dates...", "error")
+else:
+    execute("INSERT INTO bookings (...) VALUES (...)", (...))</span>
+          <div class="explain">Where it all gets used. Basic field checks run first (real package, valid date, sensible traveller count). Only if those pass does it call <code class="inline">has_overlapping_booking()</code> — if that comes back <code class="inline">True</code>, the booking is refused with a message and <b>nothing is written to the database</b>. Only when both checks pass does the <code class="inline">INSERT</code> actually happen.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="tag">Worth telling your supervisor</span>
+      The overlap check only looks at <i>this one traveller's own</i> bookings — it has nothing to do with how many seats a package has, or whether other travellers are booked on the same dates. It purely stops one person from accidentally (or fraudulently) holding two trips on the same day.
+    </div>
+  </section>
+
+  <footer>
+    Prepared from app.py — profile photo logic (lines 1317–1401), booking date logic (lines 730–819). GoGather traveller platform.
+  </footer>
+
+</div>

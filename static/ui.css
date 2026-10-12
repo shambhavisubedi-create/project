@@ -57,3 +57,62 @@ button.is-loading, input[type=submit].is-loading { opacity: 0.65; cursor: progre
 @media (prefers-reduced-motion: reduce) {
   .gg-toast, .wish-btn { transition: none; }
 }
+
+/* ==== Visual polish layer (non-layout only: radius, depth, motion, focus) ==== */
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+body { text-rendering: optimizeLegibility; }
+::selection { background: #fbe4e6; color: #8a3549; }
+
+/* Cards, panels and stat tiles: softer, warmer depth that lifts on hover */
+.card, .panel, .stat-card, .form-card, .package-row, .fact {
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(44, 36, 32, 0.04), 0 8px 24px rgba(169, 69, 92, 0.06);
+  transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease;
+}
+.stat-card:hover, .package-row:hover, a.card:hover {
+  box-shadow: 0 2px 4px rgba(44, 36, 32, 0.05), 0 14px 32px rgba(169, 69, 92, 0.12);
+  transform: translateY(-2px);
+}
+
+/* Buttons: consistent rounding, gentle press and hover */
+.btn, .btn-outline, .pay, button[type=submit] {
+  border-radius: 10px;
+  transition: background-color .15s ease, box-shadow .15s ease, transform .1s ease, color .15s ease;
+}
+.btn:hover, .pay:hover, button[type=submit]:hover { box-shadow: 0 6px 16px rgba(169, 69, 92, 0.22); }
+.btn:active, .btn-outline:active, .pay:active, button[type=submit]:active { transform: translateY(1px) scale(0.99); box-shadow: none; }
+
+/* Form fields: calm borders, one clear focus ring everywhere */
+input[type=text], input[type=email], input[type=password], input[type=tel],
+input[type=number], input[type=date], input[type=search], select, textarea {
+  border-radius: 10px;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #a9455c;
+  box-shadow: 0 0 0 3px #fbe4e6;
+}
+:focus-visible { outline: 2px solid #a9455c; outline-offset: 2px; }
+input[type=checkbox], input[type=radio] { accent-color: #a9455c; }
+
+/* Flash messages and empty states */
+.flash { border-radius: 12px; box-shadow: 0 1px 2px rgba(44, 36, 32, 0.05); }
+.empty { border-radius: 16px; }
+
+/* Tags and pills */
+.tag, .pill, .status { border-radius: 999px; letter-spacing: .01em; }
+
+/* Gentle entrance for page content */
+@keyframes gg-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+main, .container, .wrap { animation: gg-rise .35s ease both; }
+
+/* Tidy scrollbars */
+* { scrollbar-width: thin; scrollbar-color: #e3cdbd transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  main, .container, .wrap { animation: none; }
+  .card, .panel, .stat-card, .form-card, .package-row, .fact, .btn, .btn-outline, .pay { transition: none; }
+  .stat-card:hover, .package-row:hover, a.card:hover { transform: none; }
+}

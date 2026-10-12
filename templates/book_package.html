@@ -151,6 +151,186 @@
       font-size: 13px !important;
       font-weight: 700
     }
+    .change-pkg {
+      display: inline-block;
+      margin-bottom: 18px;
+      color: var(--w);
+      font-weight: bold;
+      font-size: 14px
+    }
+    .wrap.wide {
+      max-width: 1100px
+    }
+    .pkg-carousel {
+      position: relative;
+      margin: 26px -8px 0
+    }
+    .pkg-list {
+      display: flex;
+      gap: 18px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scroll-behavior: smooth;
+      padding: 8px 8px 22px;
+      scrollbar-width: thin;
+      scrollbar-color: #e3cdbd transparent
+    }
+    .pkg-item {
+      flex: 0 0 280px;
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      border: 1px solid var(--l);
+      border-radius: 20px;
+      overflow: hidden;
+      color: inherit;
+      box-shadow: 0 2px 10px rgba(44,36,32,.05);
+      transition: border-color .2s, box-shadow .25s, transform .25s
+    }
+    .pkg-item:hover {
+      border-color: #e6c3cc;
+      box-shadow: 0 16px 36px rgba(169,69,92,.18);
+      transform: translateY(-4px)
+    }
+    .pkg-cover {
+      position: relative;
+      height: 150px;
+      background: linear-gradient(135deg,#f3c9d2,#e7a7b6 55%,#c8788c) center/cover no-repeat;
+      display: flex;
+      align-items: center;
+      justify-content: center
+    }
+    .pkg-cover span {
+      font: 700 52px Georgia,serif;
+      color: rgba(255,255,255,.9)
+    }
+    .pkg-cover em {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      font-style: normal;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--i);
+      background: rgba(255,253,250,.94);
+      padding: 4px 11px;
+      border-radius: 999px
+    }
+    .pkg-main {
+      padding: 16px 18px 6px;
+      flex: 1;
+      min-width: 0
+    }
+    .pkg-main h3 {
+      margin: 4px 0 6px;
+      font-family: Georgia,serif;
+      font-size: 20px;
+      line-height: 1.25;
+      color: var(--i)
+    }
+    .pkg-tag {
+      color: var(--w);
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 1.4px;
+      text-transform: uppercase
+    }
+    .pkg-summary {
+      margin: 0 0 12px;
+      font-size: 13px;
+      color: var(--m);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden
+    }
+    .pkg-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px
+    }
+    .pkg-facts span {
+      background: #fbf1ea;
+      border: 1px solid #f3e3d8;
+      color: var(--t);
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 999px
+    }
+    .pkg-side {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 14px 18px 18px
+    }
+    .pkg-price small {
+      margin: 0;
+      font-size: 11px
+    }
+    .pkg-price strong {
+      display: block;
+      font: 700 21px Georgia,serif;
+      color: var(--w)
+    }
+    .pkg-cta {
+      background: var(--w);
+      color: #fff;
+      font-weight: bold;
+      font-size: 13px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      white-space: nowrap;
+      transition: background .2s, transform .2s
+    }
+    .pkg-item:hover .pkg-cta {
+      background: #8a3549;
+      transform: translateX(3px)
+    }
+    .pkg-arrow {
+      position: absolute;
+      top: 38%;
+      z-index: 2;
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      border-radius: 50%;
+      border: 1px solid var(--l);
+      background: #fffdfa;
+      color: var(--w);
+      font-size: 26px;
+      line-height: 1;
+      box-shadow: 0 6px 18px rgba(44,36,32,.18)
+    }
+    .pkg-arrow:hover {
+      background: #fbe4e6
+    }
+    .pkg-arrow.prev {
+      left: -14px
+    }
+    .pkg-arrow.next {
+      right: -14px
+    }
+    @media(max-width:760px) {
+      .pkg-arrow {
+        display: none
+      }
+      .pkg-item {
+        flex-basis: 78%
+      }
+    }
+    @media(max-width:600px) {
+      .pkg-item {
+        flex-direction: column;
+        align-items: stretch
+      }
+      .pkg-side {
+        text-align: left
+      }
+    }
     @media(max-width:600px) {
       .grid {
         grid-template-columns: 1fr
@@ -168,11 +348,11 @@
   {% set role_label = 'Traveller' %}
   {% include "_topbar.html" %}
 
-  <main class="wrap">
+  <main class="wrap{{ '' if package else ' wide' }}">
     <div class="card">
       <div class="ey">Secure your trip</div>
-      <h1>Confirm your booking</h1>
-      <p class="sub">Review your package and add your travel details. You can cancel an upcoming booking later from My Bookings.</p>
+      <h1>{{ 'Confirm your booking' if package else 'Choose a package' }}</h1>
+      <p class="sub">{% if package %}Review your package and add your travel details. You can cancel an upcoming booking later from My Bookings.{% else %}Pick the trip you'd like to book. You'll add your travel date and travellers on the next step.{% endif %}</p>
       {% with messages=get_flashed_messages(with_categories=true) %}
         {% for c,m in messages %}
           <div class="flash">{{ m }}</div>
@@ -191,20 +371,47 @@
             <p><small>Limited to {{ package.max_seats }} seats per departure date. If your chosen date is full, you'll be asked to pick another date or fewer travellers.</small></p>
           {% endif %}
         </div>
+        <a class="change-pkg" href="{{ url_for('book_package') }}">&larr; Choose a different package</a>
+      {% else %}
+        <div class="pkg-carousel">
+          <button type="button" class="pkg-arrow prev" aria-label="Previous packages" data-dir="-1">&#8249;</button>
+          <button type="button" class="pkg-arrow next" aria-label="Next packages" data-dir="1">&#8250;</button>
+          <div class="pkg-list" id="pkgList">
+          {% for p in packages %}
+            <a class="pkg-item" href="{{ url_for('book_package', package_id=p.id) }}">
+              <div class="pkg-cover" {% if p.cover %}style="background-image:url('{{ url_for('static', filename=p.cover) }}')"{% endif %}>
+                {% if not p.cover %}<span>{{ p.name[0]|upper }}</span>{% endif %}
+                <em>{{ p.duration_days }} days</em>
+              </div>
+              <div class="pkg-main">
+                {% if p.tag %}<span class="pkg-tag">{{ p.tag }}</span>{% endif %}
+                <h3>{{ p.name }}</h3>
+                {% if p.summary %}<p class="pkg-summary">{{ p.summary }}</p>{% endif %}
+                <div class="pkg-facts">
+                  <span>&#127976; {{ p.hotel_type|capitalize }} stay</span>
+                  <span>&#128652; {{ p.transport_mode|capitalize }}</span>
+                  {% if p.max_seats %}<span>&#128186; {{ p.max_seats }} seats / date</span>{% endif %}
+                </div>
+              </div>
+              <div class="pkg-side">
+                <div class="pkg-price">
+                  <small>From, per traveller</small>
+                  <strong>{{ p.price|npr }}</strong>
+                </div>
+                <span class="pkg-cta">Book &rarr;</span>
+              </div>
+            </a>
+          {% else %}
+            <p class="sub">No packages are available to book right now. Please check back soon.</p>
+          {% endfor %}
+        </div>
+          </div>
+        </div>
       {% endif %}
+      {% if package %}
       <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="grid">
-          {% if not package %}
-            <div class="full">
-              <label>Choose package</label>
-              <select name="package_id" required>
-                <option value="">Select a package</option>
-                {% for p in packages %}
-                  <option value="{{ p.id }}">{{ p.name }} — {{ p.price|npr }}</option>
-                {% endfor %}
-              </select>
-            </div>
-          {% else %}
+          {% if package %}
             <input type="hidden" name="package_id" value="{{ package.id }}">
           {% endif %}
           <div>
@@ -231,6 +438,7 @@
           </div>
         </div>
       </form>
+      {% endif %}
     </div>
   </main>
 
@@ -252,6 +460,19 @@
       var total = discounted * (1 + serviceFeePercent / 100);
       countLabel.textContent = travellers;
       totalLabel.textContent = 'Rs ' + Math.round(total).toLocaleString('en-US');
+    });
+  })();
+</script>
+{% endif %}
+{% if not package %}
+<script>
+  (function () {
+    var list = document.getElementById('pkgList');
+    if (!list) return;
+    document.querySelectorAll('.pkg-arrow').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        list.scrollBy({ left: parseInt(btn.dataset.dir, 10) * 600 });
+      });
     });
   })();
 </script>

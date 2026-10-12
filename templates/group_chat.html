@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ group.name }} - Group Chat | GoGather</title>
+<title>{{ (group.name ~ ' - Chat') if group else 'Chats' }} | GoGather</title>
 <style>
   :root {
     --primary: #a9455c;
@@ -14,327 +14,18 @@
     --text-muted: #8a7b73;
     --border: #f0e3d5;
     --bg: #fdf3ea;
-    --panel-bg: #ece0d6;
-    --own-bubble: #fbe4e6;
-    --other-bubble: #ffffff;
     --white: #fff;
-    --danger: #c0324a;
     --font-display: Georgia, serif;
   }
-
   * { box-sizing: border-box; }
-
   body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; }
-
-  .container { max-width: 760px; margin: auto; padding: 30px 20px 40px; }
-
-  .back-link { color: var(--primary-dark); text-decoration: none; font-size: 0.85rem; font-weight: 700; }
-  .back-link:hover { text-decoration: underline; }
-
-  .flash-msg { padding: 12px 16px; border-radius: 10px; margin: 14px 0; font-size: 0.9rem; }
+  .flash-msg { padding: 10px 16px; border-radius: 10px; margin: 0 0 10px; font-size: 0.9rem; }
   .flash-msg.success { background: #e5f3ec; color: #286650; }
   .flash-msg.error { background: #f9e6e8; color: #9b3544; }
-
-  .chat-app {
-    background: var(--panel-bg);
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    box-shadow: 0 8px 24px rgba(80, 50, 40, 0.10);
-    overflow: hidden;
-    margin-top: 14px;
-    display: flex;
-    flex-direction: column;
-    height: 640px;
-  }
-
-  /* ---- Header ---- */
-  .chat-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    background: var(--white);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-  .icon-btn {
-    background: none;
-    border: none;
-    color: var(--charcoal);
-    font-size: 1.2rem;
-    cursor: pointer;
-    text-decoration: none;
-    padding: 6px 8px;
-    border-radius: 999px;
-    line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .icon-btn:hover { background: var(--primary-light); }
-
-  .chat-avatar, .avatar-circle {
-    width: 42px; height: 42px;
-    border-radius: 50%;
-    background: var(--primary);
-    color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 1rem;
-    flex-shrink: 0;
-    font-family: var(--font-display);
-  }
-
-  .chat-title { flex: 1; min-width: 0; cursor: pointer; }
-  .chat-title h1 { font-family: var(--font-display); color: var(--charcoal); font-size: 1.05rem; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .chat-title p { margin: 2px 0 0; font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-  .menu-wrap { position: relative; flex-shrink: 0; }
-  .menu-dropdown {
-    display: none;
-    position: absolute;
-    top: 42px; right: 0;
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-    min-width: 190px;
-    overflow: hidden;
-    z-index: 20;
-  }
-  .menu-dropdown.open { display: block; }
-  .menu-dropdown button {
-    display: block;
-    width: 100%;
-    text-align: left;
-    background: none;
-    border: none;
-    padding: 12px 16px;
-    font-size: 0.88rem;
-    color: var(--text);
-    cursor: pointer;
-  }
-  .menu-dropdown button:hover { background: var(--primary-light); }
-  .menu-dropdown button.danger { color: var(--danger); font-weight: 600; }
-
-  .mode-note {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    margin-left: 6px;
-  }
-  .mode-two-way { color: #286650; }
-  .mode-one-way { color: #8a5a1c; }
-  .mode-blocked { color: #9b3544; }
-
-  /* ---- Messages ---- */
-  .messages {
-    flex: 1;
-    padding: 18px 20px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    background-image:
-      radial-gradient(circle at 10px 10px, rgba(169,69,92,0.04) 2px, transparent 2px);
-    background-size: 26px 26px;
-  }
-
-  .msg-row { display: flex; gap: 8px; align-items: flex-end; max-width: 100%; }
-  .msg-row.own { justify-content: flex-end; }
-  .msg-row.other { justify-content: flex-start; }
-
-  .msg-avatar {
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    background: var(--text-muted);
-    color: #fff;
-    font-size: 0.7rem;
-    font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .bubble {
-    max-width: 72%;
-    padding: 8px 12px 6px;
-    border-radius: 14px;
-    font-size: 0.9rem;
-    line-height: 1.45;
-    position: relative;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
-  }
-  .msg-row.own .bubble { background: var(--own-bubble); border-bottom-right-radius: 3px; }
-  .msg-row.other .bubble { background: var(--other-bubble); border-bottom-left-radius: 3px; }
-
-  .sender-name { font-size: 0.76rem; font-weight: 700; color: var(--primary-dark); margin-bottom: 2px; }
-  .bubble-text { white-space: pre-wrap; word-break: break-word; color: var(--charcoal); }
-  .bubble-time { font-size: 0.65rem; color: var(--text-muted); text-align: right; margin-top: 3px; }
-
-  .empty-chat { margin: auto; text-align: center; color: var(--text-muted); padding: 40px 20px; font-size: 0.9rem; }
-
-  /* ---- Composer ---- */
-  .composer { border-top: 1px solid var(--border); padding: 12px 16px; display: flex; gap: 10px; align-items: flex-end; background: var(--white); flex-shrink: 0; }
-  .composer textarea {
-    flex: 1;
-    resize: none;
-    border: 1px solid var(--border);
-    border-radius: 22px;
-    padding: 11px 16px;
-    font-size: 0.9rem;
-    font-family: inherit;
-    min-height: 20px;
-    max-height: 100px;
-    background: var(--bg);
-  }
-  .composer textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
-  .send-btn {
-    border: none;
-    background: var(--primary);
-    color: white;
-    font-weight: 700;
-    border-radius: 50%;
-    width: 42px; height: 42px;
-    flex-shrink: 0;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.05rem;
-  }
-  .send-btn:hover { background: var(--primary-dark); }
-
-  .locked-note {
-    border-top: 1px solid var(--border);
-    padding: 14px 20px;
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    text-align: center;
-    background: var(--white);
-    flex-shrink: 0;
-  }
-
-  /* ---- Overlays ---- */
-  .overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(30, 20, 15, 0.45);
-    z-index: 100;
-    align-items: center;
-    justify-content: center;
-  }
-  .overlay.open { display: flex; }
-
-  .info-panel {
-    background: var(--white);
-    width: 340px;
-    max-width: 90vw;
-    max-height: 85vh;
-    overflow-y: auto;
-    border-radius: 16px;
-    padding: 0 0 20px;
-  }
-  .info-panel-head {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
-    background: var(--primary);
-    color: #fff;
-    border-radius: 16px 16px 0 0;
-    position: sticky;
-    top: 0;
-  }
-  .info-panel-head button {
-    background: none; border: none; color: #fff; font-size: 1.3rem; cursor: pointer; line-height: 1;
-  }
-  .info-panel-head h2 { margin: 0; font-size: 1rem; font-family: var(--font-display); }
-
-  .info-avatar-big {
-    width: 90px; height: 90px;
-    border-radius: 50%;
-    background: var(--primary);
-    color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 2.1rem;
-    font-family: var(--font-display);
-    margin: 22px auto 12px;
-  }
-  .info-panel h3 { text-align: center; margin: 0; font-family: var(--font-display); color: var(--charcoal); }
-  .info-sub { text-align: center; color: var(--text-muted); font-size: 0.82rem; margin: 4px 0 0; }
-  .info-desc { text-align: center; color: var(--text); font-size: 0.85rem; margin: 10px 20px 0; line-height: 1.5; }
-
-  .info-section-label {
-    margin: 22px 20px 8px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-top: 1px solid var(--border);
-    padding-top: 16px;
-  }
-  .member-list { padding: 0 12px; }
-  .member-row { display: flex; align-items: center; gap: 12px; padding: 9px 8px; border-radius: 10px; }
-  .member-row:hover { background: var(--bg); }
-  .member-avatar {
-    width: 38px; height: 38px;
-    border-radius: 50%;
-    background: var(--text-muted);
-    color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 0.85rem;
-    flex-shrink: 0;
-  }
-  .member-name { font-size: 0.88rem; font-weight: 600; color: var(--charcoal); }
-  .member-name .tag { font-size: 0.65rem; font-weight: 700; color: var(--primary-dark); background: var(--primary-light); padding: 2px 7px; border-radius: 999px; margin-left: 6px; }
-  .member-username { font-size: 0.76rem; color: var(--text-muted); }
-
-  .leave-btn {
-    display: block;
-    width: calc(100% - 32px);
-    margin: 20px auto 0;
-    background: #fff;
-    border: 1px solid var(--danger);
-    color: var(--danger);
-    font-weight: 700;
-    padding: 11px;
-    border-radius: 10px;
-    cursor: pointer;
-    font-size: 0.9rem;
-  }
-  .leave-btn:hover { background: #fdecef; }
-
-  .confirm-box {
-    background: var(--white);
-    width: 340px;
-    max-width: 90vw;
-    border-radius: 14px;
-    padding: 22px;
-  }
-  .confirm-box h3 { margin: 0 0 8px; font-family: var(--font-display); color: var(--charcoal); }
-  .confirm-box p { margin: 0 0 20px; font-size: 0.86rem; color: var(--text-muted); line-height: 1.5; }
-  .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
-  .confirm-actions button {
-    border: none;
-    background: none;
-    padding: 9px 16px;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 0.86rem;
-    cursor: pointer;
-    color: var(--text);
-  }
-  .confirm-actions button:hover { background: var(--bg); }
-  .confirm-actions button.danger { color: var(--danger); }
-
-  @media (max-width: 600px) {
-    .chat-app { height: calc(100vh - 170px); border-radius: 0; }
-    .container { padding: 16px 0 0; }
-  }
 </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}">
 {% include "_ui_head.html" %}
 </head>
 <body>
@@ -344,75 +35,116 @@
   {% set role_label = 'Traveller' %}
   {% include "_topbar.html" %}
 
-<main class="container">
-  <a class="back-link" href="{{ url_for('travel_groups') }}">&larr; All travel groups</a>
-
+<main class="container chat-page">
   {% with messages_list = get_flashed_messages(with_categories=true) %}
     {% for category, message in messages_list %}
       <div class="flash-msg {{ category }}">{{ message }}</div>
     {% endfor %}
   {% endwith %}
 
-  <div class="chat-app">
-    <div class="chat-header">
-      <a class="icon-btn back-btn" href="{{ url_for('travel_groups') }}" title="Back">&larr;</a>
-      <div class="chat-avatar">{{ group.name[0]|upper }}</div>
-      <div class="chat-title" id="openInfoBtn">
-        <h1>{{ group.name }}</h1>
-        <p>
-          {{ members|length }} member{{ '' if members|length == 1 else 's' }}
-          {% if group.communication_mode == 2 %}
-            <span class="mode-note mode-two-way">&middot; everyone can post</span>
-          {% elif group.communication_mode == 1 %}
-            <span class="mode-note mode-one-way">&middot; organiser updates only</span>
-          {% else %}
-            <span class="mode-note mode-blocked">&middot; chat disabled by admin</span>
-          {% endif %}
-        </p>
-      </div>
-      <div class="menu-wrap">
-        <button class="icon-btn" id="menuBtn" type="button" title="Menu">&#8942;</button>
-        <div class="menu-dropdown" id="menuDropdown">
-          <button type="button" id="viewInfoBtn">Group info</button>
-          {% if not is_creator %}
-            <button type="button" class="danger" id="leaveBtnMenu">Leave group</button>
-          {% endif %}
-        </div>
-      </div>
-    </div>
+  <div class="chat-shell {{ 'has-chat' if group else '' }}">
 
-    <div class="messages" id="messagesPane">
-      {% for msg in messages %}
-        {% set is_own = msg.user_id == session['user_id'] %}
-        <div class="msg-row {{ 'own' if is_own else 'other' }}" data-id="{{ msg.id }}">
-          {% if not is_own %}<div class="msg-avatar">{{ msg.full_name[0]|upper }}</div>{% endif %}
-          <div class="bubble">
-            {% if not is_own %}<div class="sender-name">{{ msg.full_name }}</div>{% endif %}
-            <div class="bubble-text">{{ msg.message }}</div>
-            <div class="bubble-time">{{ msg.created_at.strftime('%I:%M %p') }}</div>
+    <!-- ===== Chat list ===== -->
+    <aside class="chat-list">
+      <div class="chat-list-head">
+        <h2>Chats</h2>
+        <input class="chat-search" id="chatSearch" type="search" placeholder="Search chats" autocomplete="off">
+      </div>
+      <div class="chat-items" id="chatItems">
+        {% for c in chat_list %}
+          <a class="chat-item {{ 'active' if group and c.id == group.id else '' }}" href="{{ url_for('group_chat', group_id=c.id) }}" data-name="{{ (c.name ~ ' ' ~ c.destination)|lower }}">
+            <div class="avatar">{{ c.name[0]|upper }}</div>
+            <div class="chat-item-body">
+              <div class="chat-item-top">
+                <span class="chat-item-name">{{ c.name }}</span>
+                <span class="chat-item-time">{{ c.last_label }}</span>
+              </div>
+              <div class="chat-item-preview">
+                {% if c.last_message %}{{ c.last_sender.split(' ')[0] }}: {{ c.last_message }}{% else %}{{ c.destination }} &middot; no messages yet{% endif %}
+              </div>
+            </div>
+          </a>
+        {% else %}
+          <div class="chat-list-empty">You're not in any group yet.<br>
+            <a href="{{ url_for('travel_groups') }}">Join or create a travel group</a> to start chatting.</div>
+        {% endfor %}
+        <div class="chat-list-empty" id="noChatMatch" hidden>No chats match your search.</div>
+      </div>
+    </aside>
+
+    <!-- ===== Conversation ===== -->
+    <section class="chat-pane">
+    {% if group %}
+      <div class="chat-header">
+        <a class="icon-btn back-btn" href="{{ url_for('chats') }}" title="Back to chats">&larr;</a>
+        <div class="avatar">{{ group.name[0]|upper }}</div>
+        <div class="chat-title" id="openInfoBtn">
+          <h1>{{ group.name }}</h1>
+          <p>
+            {{ members|length }} member{{ '' if members|length == 1 else 's' }}
+            {% if group.communication_mode == 2 %}&middot; everyone can post
+            {% elif group.communication_mode == 1 %}&middot; organiser updates only
+            {% else %}&middot; chat disabled by admin{% endif %}
+          </p>
+        </div>
+        <div class="menu-wrap">
+          <button class="icon-btn" id="menuBtn" type="button" title="Menu">&#8942;</button>
+          <div class="menu-dropdown" id="menuDropdown">
+            <button type="button" id="viewInfoBtn">Group info</button>
+            {% if not is_creator %}
+              <button type="button" class="danger" id="leaveBtnMenu">Leave group</button>
+            {% endif %}
           </div>
         </div>
-      {% else %}
-        <div class="empty-chat">No messages yet. Be the first to say something.</div>
-      {% endfor %}
-    </div>
+      </div>
 
-    {% if can_post %}
-      <form class="composer" method="POST" action="{{ url_for('group_chat', group_id=group.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <textarea name="message" placeholder="Write a message to the group..." required maxlength="1000" rows="1"></textarea>
-        <button type="submit" class="send-btn" title="Send">&#10148;</button>
-      </form>
-    {% elif group.communication_mode == 0 %}
-      <div class="locked-note">The admin has disabled communication for this group.</div>
-    {% elif group.communication_mode == 1 %}
-      <div class="locked-note">Only the group organiser can post here. You can still read updates.</div>
+      {% set name_colors = ['#c0392b', '#1f8a70', '#8e44ad', '#d35400', '#2471a3', '#b7950b', '#a9456c'] %}
+      <div class="messages" id="messagesPane">
+        {% set ns = namespace(day=none) %}
+        {% for msg in messages %}
+          {% set is_own = msg.user_id == session['user_id'] %}
+          {% set msg_day = msg.created_at.date() %}
+          {% if msg_day != ns.day %}
+            {% set ns.day = msg_day %}
+            <div class="date-chip">{{ msg.created_at.strftime('%d %B %Y') }}</div>
+          {% endif %}
+          <div class="msg-row {{ 'own' if is_own else 'other' }}" data-id="{{ msg.id }}">
+            <div class="bubble">
+              {% if not is_own %}<div class="sender-name" style="color: {{ name_colors[msg.user_id % name_colors|length] }}">{{ msg.full_name }}</div>{% endif %}
+              <span class="bubble-text">{{ msg.message }}</span>
+              <span class="bubble-meta">{{ msg.created_at.strftime('%I:%M %p').lstrip('0') }}{% if is_own %}<span class="tick">&#10003;&#10003;</span>{% endif %}</span>
+            </div>
+          </div>
+        {% else %}
+          <div class="empty-chat">No messages yet. Say hello &#128075;</div>
+        {% endfor %}
+      </div>
+
+      {% if can_post %}
+        <form class="composer" method="POST" action="{{ url_for('group_chat', group_id=group.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <textarea name="message" placeholder="Type a message" required maxlength="1000" rows="1"></textarea>
+          <button type="submit" class="send-btn" title="Send">&#10148;</button>
+        </form>
+      {% elif group.communication_mode == 0 %}
+        <div class="locked-note">The admin has disabled communication for this group.</div>
+      {% elif group.communication_mode == 1 %}
+        <div class="locked-note">Only the group organiser can post here. You can still read updates.</div>
+      {% endif %}
+    {% else %}
+      <div class="chat-welcome">
+        <div class="big">&#128172;</div>
+        <h2>Your group chats</h2>
+        <p>Pick a group from the list to read and send messages. Chats for every travel group you've joined show up here.</p>
+      </div>
     {% endif %}
+    </section>
   </div>
 </main>
 
   </div>
 </div>
 
+{% if group %}
 <!-- Group info panel -->
 <div class="overlay" id="infoOverlay">
   <div class="info-panel">
@@ -420,7 +152,7 @@
       <button type="button" id="closeInfoBtn">&larr;</button>
       <h2>Group info</h2>
     </div>
-    <div class="info-avatar-big">{{ group.name[0]|upper }}</div>
+    <div class="avatar info-avatar-big">{{ group.name[0]|upper }}</div>
     <h3>{{ group.name }}</h3>
     <p class="info-sub">{{ group.destination }}</p>
     {% if group.description %}<p class="info-desc">{{ group.description }}</p>{% endif %}
@@ -429,7 +161,7 @@
     <div class="member-list">
       {% for m in members %}
         <div class="member-row">
-          <div class="member-avatar">{{ m.full_name[0]|upper }}</div>
+          <div class="avatar">{{ m.full_name[0]|upper }}</div>
           <div>
             <div class="member-name">{{ m.full_name }}{% if m.id == group.created_by %}<span class="tag">Organiser</span>{% endif %}</div>
             <div class="member-username">@{{ m.username }}</div>
@@ -459,11 +191,29 @@
   </div>
 </div>
 {% endif %}
+{% endif %}
 
 <script src="{{ url_for('static', filename='sidebar.js') }}" defer></script>
 <script>
+  // ---- Chat list search ----
+  const chatSearch = document.getElementById('chatSearch');
+  chatSearch && chatSearch.addEventListener('input', () => {
+    const term = chatSearch.value.trim().toLowerCase();
+    let shown = 0;
+    document.querySelectorAll('.chat-item').forEach((item) => {
+      const match = item.dataset.name.includes(term);
+      item.style.display = match ? '' : 'none';
+      if (match) shown++;
+    });
+    const none = document.getElementById('noChatMatch');
+    if (none) none.hidden = shown !== 0 || document.querySelectorAll('.chat-item').length === 0;
+  });
+</script>
+{% if group %}
+<script>
   const messagesPane = document.getElementById('messagesPane');
   if (messagesPane) messagesPane.scrollTop = messagesPane.scrollHeight;
+  const NAME_COLORS = {{ name_colors|tojson }};
 
   const menuBtn = document.getElementById('menuBtn');
   const menuDropdown = document.getElementById('menuDropdown');
@@ -500,13 +250,14 @@
     composerTextarea.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        composerTextarea.form.submit();
+        if (composerTextarea.value.trim()) composerTextarea.form.submit();
       }
     });
     composerTextarea.addEventListener('input', () => {
       composerTextarea.style.height = 'auto';
-      composerTextarea.style.height = Math.min(composerTextarea.scrollHeight, 100) + 'px';
+      composerTextarea.style.height = Math.min(composerTextarea.scrollHeight, 110) + 'px';
     });
+    composerTextarea.focus();
   }
 
   // Real-time-feeling delivery: poll for new messages every few seconds
@@ -525,32 +276,32 @@
     row.className = 'msg-row ' + (msg.is_own ? 'own' : 'other');
     row.dataset.id = msg.id;
 
-    if (!msg.is_own) {
-      const avatar = document.createElement('div');
-      avatar.className = 'msg-avatar';
-      avatar.textContent = msg.full_name.charAt(0).toUpperCase();
-      row.appendChild(avatar);
-    }
-
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
 
     if (!msg.is_own) {
       const sender = document.createElement('div');
       sender.className = 'sender-name';
+      sender.style.color = NAME_COLORS[msg.user_id % NAME_COLORS.length];
       sender.textContent = msg.full_name;
       bubble.appendChild(sender);
     }
 
-    const text = document.createElement('div');
+    const text = document.createElement('span');
     text.className = 'bubble-text';
     text.textContent = msg.message;
     bubble.appendChild(text);
 
-    const time = document.createElement('div');
-    time.className = 'bubble-time';
-    time.textContent = msg.time;
-    bubble.appendChild(time);
+    const meta = document.createElement('span');
+    meta.className = 'bubble-meta';
+    meta.textContent = msg.time.replace(/^0/, '');
+    if (msg.is_own) {
+      const tick = document.createElement('span');
+      tick.className = 'tick';
+      tick.textContent = '✓✓';
+      meta.appendChild(tick);
+    }
+    bubble.appendChild(meta);
 
     row.appendChild(bubble);
     messagesPane.appendChild(row);
@@ -579,6 +330,7 @@
     setInterval(pollForNewMessages, POLL_INTERVAL_MS);
   }
 </script>
+{% endif %}
 {% include "_ui_foot.html" %}
 </body>
 </html>

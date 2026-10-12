@@ -20,7 +20,7 @@ class ReportsTests(unittest.TestCase):
             session['user'] = role
 
     def test_admin_access(self):
-        self.assertTrue(self.client.get('/admin/reports').location.endswith('/login'))
+        self.assertTrue(self.client.get('/admin/reports').location.startswith('/login'))
         self.login(0)
         self.assertTrue(self.client.get('/admin/reports').location.endswith('/dashboard'))
         self.query.assert_not_called()

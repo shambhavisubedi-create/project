@@ -206,7 +206,7 @@ class PasswordResetTests(BaseCase):
         statuses = [
             self.client.post('/verify-otp', data={
                 'csrf_token': self.get_token(), 'phone': '9800000101', 'otp': wrong,
-                'password': 'brand-new-pass', 'confirm_password': 'brand-new-pass'}).status_code
+                'password': 'Brand-New-Pass1!', 'confirm_password': 'Brand-New-Pass1!'}).status_code
             for _ in range(7)
         ]
         self.assertEqual(statuses[:6], [200] * 6)
@@ -215,11 +215,11 @@ class PasswordResetTests(BaseCase):
         app_module._rate_hits.clear()
         done = self.client.post('/verify-otp', data={
             'csrf_token': self.get_token(), 'phone': '9800000101', 'otp': codes[0],
-            'password': 'brand-new-pass', 'confirm_password': 'brand-new-pass'})
+            'password': 'Brand-New-Pass1!', 'confirm_password': 'Brand-New-Pass1!'})
         self.assertEqual(done.status_code, 302)
         with app.app_context():
             row = query("SELECT password_hash FROM users WHERE id = %s", (self.user_id,), fetch="one")
-        self.assertTrue(check_password_hash(row['password_hash'], 'brand-new-pass'))
+        self.assertTrue(check_password_hash(row['password_hash'], 'Brand-New-Pass1!'))
 
     def get_token(self):
         self.client.get('/forgot-password')
@@ -240,16 +240,16 @@ class ChangePasswordTests(BaseCase):
 
     def test_wrong_current_short_and_mismatch_are_rejected(self):
         token = self.login(self.client)
-        self.change(token, 'not-my-password', 'valid-new-pass')
+        self.change(token, 'not-my-password', 'Valid-New-Pass1!')
         self.change(token, 'old-password-1', 'short')
-        self.change(token, 'old-password-1', 'valid-new-pass', 'different-pass')
+        self.change(token, 'old-password-1', 'Valid-New-Pass1!', 'different-pass')
         self.assertTrue(self.hash_matches('old-password-1'))
 
     def test_correct_change_works(self):
         token = self.login(self.client)
-        response = self.change(token, 'old-password-1', 'valid-new-pass')
+        response = self.change(token, 'old-password-1', 'Valid-New-Pass1!')
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(self.hash_matches('valid-new-pass'))
+        self.assertTrue(self.hash_matches('Valid-New-Pass1!'))
 
 
 class TravellerExperienceTests(BaseCase):

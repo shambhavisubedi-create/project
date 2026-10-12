@@ -329,8 +329,8 @@
             </div>
           {% else %}
             <div class="actions">
-              <a class="pay pay-esewa" href="{{ url_for('pay_with_esewa', booking_id=booking.id) }}">Pay with eSewa (NPR)</a>
-              <a class="pay pay-stripe" href="{{ url_for('pay_with_stripe', booking_id=booking.id) }}">Pay with Card (USD)</a>
+              <a class="pay pay-esewa" href="{{ url_for('payment_agreement', booking_id=booking.id, method='esewa') }}">Pay with eSewa (NPR)</a>
+              <a class="pay pay-stripe" href="{{ url_for('payment_agreement', booking_id=booking.id, method='stripe') }}">Pay with Card (USD)</a>
             </div>
           {% endif %}
         {% endif %}
