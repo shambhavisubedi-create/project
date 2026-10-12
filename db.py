@@ -12,6 +12,19 @@ DB_CONFIG = {
     "autocommit": False,
 }
 
+# Hosted databases such as TiDB Cloud only accept encrypted connections. Set
+# DB_SSL=1 to connect over TLS and verify the server against certifi's CA
+# bundle (certifi is installed with `requests`). Local XAMPP leaves it unset.
+if os.environ.get("DB_SSL") == "1":
+    import certifi
+
+    DB_CONFIG.update(
+        ssl_disabled=False,
+        ssl_ca=certifi.where(),
+        ssl_verify_cert=True,
+        ssl_verify_identity=True,
+    )
+
 _pool = None
 
 

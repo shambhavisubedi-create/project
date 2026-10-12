@@ -1,0 +1,47 @@
+# Render blueprint -- deploys GoGather from GitHub on every push.
+# Values marked `sync: false` are asked for once in the Render dashboard
+# (they are secrets or depend on your own database / URL).
+services:
+  - type: web
+    name: gogather
+    runtime: python
+    plan: free
+    branch: master
+    buildCommand: pip install -r requirements.txt
+    # One worker with threads: the sign-up / reset / support rate limiters keep
+    # their counts in memory (see DEPLOYMENT.md).
+    startCommand: gunicorn wsgi:application --workers 1 --threads 8 --bind 0.0.0.0:$PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: APP_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: SECRET_KEY
+        generateValue: true
+      # Public address of the site, e.g. https://gogather.onrender.com
+      - key: APP_BASE_URL
+        sync: false
+      # MySQL (TiDB Cloud). DB_SSL=1 turns on the encrypted connection it needs.
+      - key: DB_SSL
+        value: "1"
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "4000"
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false
+      # Demo site: allows eSewa's public TEST wallet in production mode.
+      # Remove (and set real ESEWA_* keys) before taking real money.
+      - key: ESEWA_ALLOW_SANDBOX
+        value: "1"
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false

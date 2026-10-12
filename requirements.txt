@@ -6,7 +6,7 @@ mysql-connector-python==9.6.0
 reportlab==5.0.1
 Werkzeug==3.1.8
 
-# Production web server -- install ONE of these on the server, not needed for
-# local development (see DEPLOYMENT.md):
-#   gunicorn   (Linux/macOS)
+# Production web server. gunicorn is installed automatically on Linux hosts
+# (Render etc.); on Windows use waitress instead (see DEPLOYMENT.md):
 #   waitress   (Windows)
+gunicorn==23.0.0; sys_platform != "win32"

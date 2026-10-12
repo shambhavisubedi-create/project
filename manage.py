@@ -125,8 +125,14 @@ def cmd_init_db(_args):
         return 1
 
     # Connect without a database first so the database itself can be created.
+    tls = {}
+    if os.environ.get("DB_SSL") == "1":
+        import certifi
+
+        tls = dict(ssl_disabled=False, ssl_ca=certifi.where(), ssl_verify_cert=True, ssl_verify_identity=True)
     connection = mysql.connector.connect(
         host=settings["host"], port=int(settings["port"]), user=settings["user"], password=settings["password"],
+        **tls,
     )
     cursor = connection.cursor()
     cursor.execute(
